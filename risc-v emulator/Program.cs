@@ -244,7 +244,7 @@ class CPU
                 else if (funct3 == 0x1) // LH
                 {
                     short val16 = (short)mem.Read16((int)load_addr);
-                    regs.Write((int)rd, (uint)((int)load_addr));
+                    regs.Write((int)rd, (uint)((int)val16));
                 }
 
                 else if (funct3 == 0x2) // LW
@@ -263,6 +263,31 @@ class CPU
                     regs.Write((int)rd, mem.Read16((int)load_addr));
                 }
                 break;
+
+            case 0x23: // S-Type Stores
+
+                int imm_s = ((int)(instruction & 0xFE000000) >> 20 | (int)(instruction >> 7) & 0x1F);
+                uint store_addr = regs.Read((int)rs1) + (uint)imm_s;
+                uint val_to_store = regs.Read((int)rs2);
+
+                if (funct3 == 0x0) // SB
+                {
+                    mem.Write8((int)store_addr, val_to_store);
+                }
+
+                else if (funct3 == 0x1) // SH
+                {
+                    mem.Write16((int)store_addr, val_to_store);
+                }
+
+                else if (funct3 == 0x2) // SW
+                {
+                    mem.Write32((int)store_addr, val_to_store);
+                }
+
+                break;
+
+
 
             default:
                 Console.WriteLine("Unkown Opcode: " + opcode.ToString("X"));
