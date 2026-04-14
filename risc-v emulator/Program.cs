@@ -82,11 +82,11 @@ class CPU
 
         switch (opcode)
         {
-            case 0x33:
+            case 0x33: //R-Type operations
                 uint val1 = regs.Read((int)rs1);
                 uint val2 = regs.Read((int)rs2);
                 
-                if (funct3 == 0x0)
+                if (funct3 == 0x0) //Addition or subtraction
                 {
                     if (funct7 == 0x0)
                     {
@@ -98,24 +98,109 @@ class CPU
                     }
                 }
 
-                else if (funct3 == 0x7)
+                else if (funct3 == 0x1) //Shift left logical
                 {
-                    regs.Write((int)rd, val1 & val2);
+                    int shiftAmount = (int)(val2 & 0x1F);
+                    regs.Write((int)rd, val1 << shiftAmount);
                 }
 
-                else if (funct3 == 0x6)
+                else if (funct3 == 0x2) //Set less than(signed comparison)
+                {
+                    int s1 = (int)val1;
+                    int s2 = (int)val2;
+                    regs.Write((int)rd, s1 < s2 ? 1u : 0u);
+                }
+
+                else if (funct3 == 0x3) //Set less than (unsigned comparison)
+                {
+                    regs.Write((int)rd, val1 < val2 ? 1u : 0u);
+                }
+
+                else if (funct3 == 0x4) //XOR
+                {
+                    regs.Write((int)rd, val1 ^ val2);
+                }
+
+                else if (funct3 == 0x5) //Shift right Logical/Arithmetic
+                {
+                    int shiftAmount = (int)(val2 & 0x1F);
+
+                    if (funct7 == 0x00)
+                    {
+                        regs.Write((int)rd, val1 >> shiftAmount);
+                    }
+
+                    else if (funct7 == 0x20)
+                    {
+                        int signedVal1 = (int)val1;
+                        regs.Write((int)rd, (uint)(signedVal1 >> shiftAmount));
+                    }
+                }
+
+                else if (funct3 == 0x6) //OR
                 {
                     regs.Write((int)rd, val1 | val2);
                 }
+
+                else if (funct3 == 0x7) //AND
+                {
+                    regs.Write((int)rd, val1 & val2);
+                }
                 break;
 
-            case 0x13:
+            case 0x13: //I-Type operations
                 uint i_val1 = regs.Read((int)rs1);
                 int imm = ((int)instruction) >> 20;
 
-                if (funct3 == 0x0)
+                if (funct3 == 0x0) //ADDI
                 {
                     regs.Write((int)rd, (uint)(i_val1 + imm));
+                }
+
+                else if (funct3 == 0x1) // SLLI
+                {
+                    int shamt = (int)rs2;
+                    regs.Write((int)rd, i_val1 << shamt);
+                }
+
+                else if (funct3 == 0x2) // SLTI
+                {
+                    regs.Write((int)rd, (int)i_val1 < imm ? 1u : 0u);
+                }
+
+                else if (funct3 == 0x3) // SLTIU
+                {
+                    regs.Write((int)rd, (uint)i_val1 < imm ? 1u : 0u);
+                }
+
+                else if (funct3 == 0x4) // XORI
+                {
+                    regs.Write((int)rd, i_val1 ^ (uint)imm);
+                }
+
+                else if (funct3 == 0x5) // SRLI / SRAI
+                {
+                    int shamt = (int)rs2;
+
+                    if (funct7 == 0x00)
+                    {
+                        regs.Write((int)rd, i_val1 >> shamt);
+                    }
+
+                    else if (funct7 == 0x20)
+                    {
+                        regs.Write((int)rd, (uint)((int)i_val1 >> shamt));
+                    }
+                }
+
+                else if (funct3 == 0x6) //ORI
+                {
+                    regs.Write((int)rd, i_val1 | (uint)imm);
+                }
+
+                else if (funct3 == 0x7) //ANDI
+                {
+                    regs.Write((int)rd, i_val1 & (uint)imm);
                 }
 
                 break;
