@@ -230,6 +230,40 @@ class CPU
 
                 break;
 
+            case 0x03: //I-Type Loads
+
+                int load_imm = ((int)instruction) >> 20;
+                uint load_addr = regs.Read((int)rs1) + (uint)load_imm;
+
+                if (funct3 == 0x0) // LB
+                {
+                    sbyte val8 = (sbyte)mem.Read8((int)load_addr);
+                    regs.Write((int)rd, (uint)((int)val8));
+                }
+
+                else if (funct3 == 0x1) // LH
+                {
+                    short val16 = (short)mem.Read16((int)load_addr);
+                    regs.Write((int)rd, (uint)((int)load_addr));
+                }
+
+                else if (funct3 == 0x2) // LW
+                {
+                    uint val32 = mem.Read32((int)load_addr);
+                    regs.Write((int)rd, val32);
+                }
+
+                else if (funct3 == 0x4) // LBU
+                {
+                    regs.Write((int)rd, mem.Read8((int)load_addr));
+                }
+
+                else if (funct3 == 0x5) // LHU
+                {
+                    regs.Write((int)rd, mem.Read16((int)load_addr));
+                }
+                break;
+
             default:
                 Console.WriteLine("Unkown Opcode: " + opcode.ToString("X"));
                 break;
