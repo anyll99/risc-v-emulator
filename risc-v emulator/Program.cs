@@ -3,13 +3,37 @@
 {
     private byte[] byte_array_ = new byte[65536];
 
+    public uint Read8(int address)
+    {
+        return (uint)byte_array_[address];
+    }
+
+    public uint Read16(int address)
+    {
+        return (uint)byte_array_[address] |
+               (uint)byte_array_[address + 1] << 8;
+    }
+
     public uint Read32(int address)
     {
-        return  (uint)byte_array_[address]           |
-                (uint)byte_array_[address + 1] << 8  |
+        return (uint)byte_array_[address] |
+                (uint)byte_array_[address + 1] << 8 |
                 (uint)byte_array_[address + 2] << 16 |
                 (uint)byte_array_[address + 3] << 24;
 
+    }
+
+    public void Write8(int address, uint value)
+    {
+        byte_array_[address] = (byte)value;
+        return;
+    }
+
+    public void Write16(int address, uint value)
+    {
+        byte_array_[address] = (byte)value;
+        byte_array_[address + 1] = (byte)(value >> 8);
+        return;
     }
 
     public void Write32(int address, uint value)
@@ -20,6 +44,7 @@
         byte_array_[address + 3] = (byte)(value >> 24);
         return;
     }
+
 } 
 
 class Registers()
