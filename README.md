@@ -29,10 +29,3 @@ The emulator is built around three core modules:
  1. **Fetch** Pulls a 32-bit instruction from memory.
  2. **Decode** Breaks the instruction into opcode, registers and immediates.
  3. **Execute** Performs the logic and updates the CPU state (PC, Registers or Memory).
-
-## Current Status: Work in progress (4/14/2026)
-- [x] Memory & Register Implementation
-- [x] R-Type & I-Type Math
-- [x] Load/Store Instructions
-- [ ] Branching Logic (B-Type)
-- [ ] Jump Instructions (J-Type)
