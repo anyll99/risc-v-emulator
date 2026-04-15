@@ -287,6 +287,53 @@ class CPU
 
                 break;
 
+            case 0x63:
+
+                int imm_b = ((int)(instruction & 0x80000000) >> 19) |
+                            ((int)(instruction & 0x00000080) << 4) |
+                            ((int)(instruction & 0x7E000000) >> 20) |
+                            ((int)(instruction & 0x00000F00) >> 7);
+
+                uint b_val1 = regs.Read((int)rs1);
+                uint b_val2 = regs.Read((int)rs2);
+                bool take_branch = false;
+
+                if (funct3 == 0x0) // BEQ
+                {
+                    take_branch = (b_val1 == b_val2);
+                }
+
+                else if (funct3 == 0x1) // BNE
+                {
+                    take_branch = (b_val1 != b_val2);
+                }
+
+                else if (funct3 == 0x4) // BLT
+                {
+                    take_branch = ((int)b_val1 < b_val2);
+                }
+
+                else if (funct3 == 0x5) // BGE
+                {
+                    take_branch = ((int)b_val1 == (int)b_val2);
+                }
+
+                else if (funct3 == 0x6) // BLTU
+                {
+                    take_branch = (b_val1 < b_val2);
+                }
+
+                else if (funct3 == 0x7) // BGEU
+                {
+                    take_branch = (b_val1 >= b_val2);
+                }
+
+                if (take_branch)
+                {
+                    pc = (uint)((int)pc - 4 + imm_b);
+                }
+
+                break;
 
 
             default:
