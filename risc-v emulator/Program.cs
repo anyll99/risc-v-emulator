@@ -2,23 +2,33 @@
 
 class Memory
 {
-    private byte[] byte_array_ = new byte[65536];
+    private byte[] byte_array_;
+
+    public Memory(int size = 65536)
+    {
+        byte_array_ = new byte[size];
+    }
+
+    private bool InBounds(int address, int width)
+        => address >= 0 && address <= byte_array_.Length - width;
 
     public uint Read8(int address)
     {
+        if (!InBounds(address, 1)) return 0;
         return byte_array_[address];
     }
 
     public uint Read16(int address)
     {
+        if (!InBounds(address, 2)) return 0;
         return (uint)(byte_array_[address] |
-               (byte_array_[address + 1] << 8));
+                (byte_array_[address + 1] << 8));
     }
+
 
     public uint Read32(int address)
     {
-        if (address > byte_array_.Length - 4) return 0;
-
+        if (!InBounds(address, 4)) return 0;
         return (uint)(
             byte_array_[address] |
             (byte_array_[address + 1] << 8) |
@@ -29,17 +39,20 @@ class Memory
 
     public void Write8(int address, uint value)
     {
+        if (!InBounds(address, 1)) return;
         byte_array_[address] = (byte)value;
     }
 
     public void Write16(int address, uint value)
     {
+        if (!InBounds(address, 2)) return;
         byte_array_[address] = (byte)value;
         byte_array_[address + 1] = (byte)(value >> 8);
     }
 
     public void Write32(int address, uint value)
     {
+        if (!InBounds(address, 4)) return;
         byte_array_[address] = (byte)value;
         byte_array_[address + 1] = (byte)(value >> 8);
         byte_array_[address + 2] = (byte)(value >> 16);
@@ -64,8 +77,29 @@ class CPU
     private Memory mem = new Memory();
     private Registers regs = new Registers();
     private uint pc = 0;
+    public bool Debug = false;
+    public bool Halted { get; private set; } = false;
+    
+
+    private const uint OP_R_TYPE = 0x33;
+    private const uint OP_I_TYPE = 0x13;
+    private const uint OP_LOAD = 0x03;
+    private const uint OP_STORE = 0x23;
+    private const uint OP_BRANCH = 0x63;
+    private const uint OP_LUI = 0x37;
+    private const uint OP_AUIPC = 0x17;
+    private const uint OP_JAL = 0x6F;
+    private const uint OP_JALR = 0x67;
+    private const uint OP_SYSTEM = 0x73;
+
+    public CPU(int memorySize = 65536)
+    {
+        mem = new Memory(memorySize);
+    }
 
     public uint PC => pc;
+
+    public uint GetReg(int i) => regs.Read(i);
 
     public uint PeekInstruction() => mem.Read32((int)pc);
 
@@ -77,13 +111,16 @@ class CPU
 
     public void Step()
     {
+
+        if (Halted) return;
+
         uint inst = mem.Read32((int)pc);
 
         uint opcode = inst & 0x7F;
-        uint rd = (inst >> 7) & 0x1F;
+        uint rd     = (inst >> 7) & 0x1F;
         uint funct3 = (inst >> 12) & 0x7;
-        uint rs1 = (inst >> 15) & 0x1F;
-        uint rs2 = (inst >> 20) & 0x1F;
+        uint rs1    = (inst >> 15) & 0x1F;
+        uint rs2    = (inst >> 20) & 0x1F;
         uint funct7 = (inst >> 25) & 0x7F;
 
         uint oldPc = pc;
@@ -92,7 +129,7 @@ class CPU
         switch (opcode)
         {
             // ================= R TYPE =================
-            case 0x33:
+            case OP_R_TYPE:
             {
                 uint a = regs.Read((int)rs1);
                 uint b = regs.Read((int)rs2);
@@ -138,11 +175,10 @@ class CPU
             }
 
             // ================= I TYPE =================
-            case 0x13:
+            case OP_I_TYPE:
             {
                 uint a = regs.Read((int)rs1);
                 int imm = SignExtend(inst >> 20, 12);
-
                 int shamt = (int)((inst >> 20) & 0x1F);
 
                 switch (funct3)
@@ -186,7 +222,7 @@ class CPU
             }
 
             // ================= LOAD =================
-            case 0x03:
+            case OP_LOAD:
             {
                 int imm = SignExtend(inst >> 20, 12);
                 uint addr = (uint)((int)regs.Read((int)rs1) + imm);
@@ -217,7 +253,7 @@ class CPU
             }
 
             // ================= STORE =================
-            case 0x23:
+            case OP_STORE:
             {
                 int imm =
                     SignExtend(
@@ -244,7 +280,7 @@ class CPU
             }
 
             // ================= BRANCH =================
-            case 0x63:
+            case OP_BRANCH:
             {
                 uint a = regs.Read((int)rs1);
                 uint b = regs.Read((int)rs2);
@@ -276,17 +312,17 @@ class CPU
             }
 
             // ================= LUI =================
-            case 0x37:
+            case OP_LUI:
                 regs.Write((int)rd, inst & 0xFFFFF000);
                 break;
 
             // ================= AUIPC =================
-            case 0x17:
+            case OP_AUIPC:
                 regs.Write((int)rd, (uint)((int)oldPc + (int)(inst & 0xFFFFF000)));
                 break;
 
             // ================= JAL =================
-            case 0x6F:
+            case OP_JAL:
             {
                 int imm =
                     SignExtend(
@@ -303,7 +339,7 @@ class CPU
             }
 
             // ================= JALR =================
-            case 0x67:
+            case OP_JALR:
             {
                 int imm = SignExtend(inst >> 20, 12);
                 uint target = (uint)((int)regs.Read((int)rs1) + imm) & ~1u;
@@ -313,13 +349,76 @@ class CPU
                 break;
             }
 
+            case OP_SYSTEM:
+            {
+                uint funct12 = inst >> 20;
+
+                switch (funct12)
+                {
+                    case 0x000:
+                        HandleEcall();
+                        break;
+                    
+                    case 0x001:
+                        Console.WriteLine("EBREAK hit - halting.");
+                        Halted = true;
+                        break;
+                    
+                    default:
+                        Console.WriteLine($"Unhandled SYSTEM funct12: 0x{funct12:X3}");
+                        break;
+                }
+                break;
+            }
+
             default:
-                Console.WriteLine($"Unknown opcode: {opcode:X}");
+                Console.WriteLine($"Unknown opcode: 0x{opcode:X2} at PC=0x{oldPc:X8}");
+                Halted = true;
+                break;
+        
+        }
+
+        if (Debug)
+        {
+            Console.WriteLine(
+                $"PC=0x{oldPc:X8} op=0x{opcode:X2} rd={rd, -2} " +
+                $"rs1={rs1, -2} rs2={rs2, -2} f3={funct3} f7=0x{funct7:X2}"
+            );
+        }
+    }
+
+    private void HandleEcall()
+    {
+        uint syscall = regs.Read(17);
+
+        switch (syscall)
+        {
+            case 93:
+                uint exitCode = regs.Read(10);
+                Console.WriteLine($"ECALL exit({exitCode})");
+                Halted = true;
+                break;
+            
+            case 64:
+            {
+                uint fd = regs.Read(10);
+                uint buf = regs.Read(11);
+                uint count = regs.Read(12);
+
+                if (fd == 1 || fd == 2)
+                {
+                    for (uint i = 0; i < count; ++i)
+                        Console.Write((char)mem.Read8((int)(buf + i)));
+                }
+
+                regs.Write(10, count);
+                break;
+            }
+
+            default:
+                Console.WriteLine($"Unhandled ECALL syscall={syscall}");
                 break;
         }
-        Console.WriteLine(
-    $"PC={oldPc:X}, opcode={opcode:X}, rd={rd}, rs1={rs1}, rs2={rs2}, funct3={funct3}, funct7={funct7}"
-);
     }
 
     public void DumpRegisters()
@@ -327,43 +426,49 @@ class CPU
         Console.WriteLine($"PC: 0x{pc:X8}");
         for (int i = 0; i < 32; i++)
         {
-            Console.Write($"x{i}: {regs.Read(i),-10}");
+            Console.Write($"x{i}: {regs.Read(i),-12}");
             if ((i + 1) % 4 == 0) Console.WriteLine();
         }
         Console.WriteLine("----------------------------------");
     }
 
-    public void LoadProgram(byte[] program)
+    public void LoadProgram(byte[] program, uint loadAddress = 0)
     {
         for (int i = 0; i < program.Length; i++)
-            mem.Write8(i, program[i]);
+            mem.Write8((int)(loadAddress + i), program[i]);
     }
 }
 
-class Program
+class RiscVProgram
 {
     static void Main()
     {
         CPU cpu = new CPU();
-
-        byte[] program = 
+        cpu.Debug = true;
+ 
+        // addi x1, x0, 20   → 0x01400093
+        // addi x2, x0, 5    → 0x00500113
+        // add  x3, x1, x2   → 0x002081B3   (x3 = 25)
+        // sub  x4, x1, x2   → 0x40208233   (x4 = 15)
+        // ebreak             → 0x00100073
+        byte[] program =
         {
-            0x93, 0x00, 0x00, 0xFF, // addi x1, x0, 20
-            0x13, 0x01, 0x20, 0x00, // addi x2, x0, 5
-            0x33, 0xD1, 0x20, 0x00,
-            0xB3, 0x52, 0x21, 0x40
+            0x93, 0x00, 0x40, 0x01,  // addi x1, x0, 20
+            0x13, 0x01, 0x50, 0x00,  // addi x2, x0, 5
+            0xB3, 0x81, 0x20, 0x00,  // add  x3, x1, x2
+            0x33, 0x82, 0x20, 0x40,  // sub  x4, x1, x2
+            0x73, 0x00, 0x10, 0x00,  // ebreak
         };
+ 
         cpu.LoadProgram(program);
-
         Console.WriteLine($"Loaded {program.Length} bytes");
-
-        for (int i = 0; i < 3; i++)
-        {
-            if (cpu.PeekInstruction() == 0) break;
+        Console.WriteLine();
+ 
+        while (!cpu.Halted)
             cpu.Step();
-            cpu.DumpRegisters();
-        }
-
+ 
+        Console.WriteLine();
+        cpu.DumpRegisters();
         Console.WriteLine("Done");
         Console.ReadLine();
     }
