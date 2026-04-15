@@ -1,42 +1,41 @@
-﻿
- class Memory()
+﻿using System;
+
+class Memory
 {
     private byte[] byte_array_ = new byte[65536];
 
     public uint Read8(int address)
     {
-        return (uint)byte_array_[address];
+        return byte_array_[address];
     }
 
     public uint Read16(int address)
     {
-        return (uint)byte_array_[address] |
-               (uint)byte_array_[address + 1] << 8;
+        return (uint)(byte_array_[address] |
+               (byte_array_[address + 1] << 8));
     }
 
     public uint Read32(int address)
     {
-
         if (address > byte_array_.Length - 4) return 0;
 
-        return (uint)byte_array_[address] |
-                (uint)byte_array_[address + 1] << 8 |
-                (uint)byte_array_[address + 2] << 16 |
-                (uint)byte_array_[address + 3] << 24;
-
+        return (uint)(
+            byte_array_[address] |
+            (byte_array_[address + 1] << 8) |
+            (byte_array_[address + 2] << 16) |
+            (byte_array_[address + 3] << 24)
+        );
     }
 
     public void Write8(int address, uint value)
     {
         byte_array_[address] = (byte)value;
-        return;
     }
 
     public void Write16(int address, uint value)
     {
         byte_array_[address] = (byte)value;
         byte_array_[address + 1] = (byte)(value >> 8);
-        return;
     }
 
     public void Write32(int address, uint value)
@@ -45,440 +44,327 @@
         byte_array_[address + 1] = (byte)(value >> 8);
         byte_array_[address + 2] = (byte)(value >> 16);
         byte_array_[address + 3] = (byte)(value >> 24);
-        return;
     }
+}
 
-} 
-
-class Registers()
+class Registers
 {
-    private uint[] register_array_ = new uint[32];
+    private uint[] r = new uint[32];
 
-    public uint Read(int index)
+    public uint Read(int i) => i == 0 ? 0 : r[i];
+
+    public void Write(int i, uint v)
     {
-        if (index == 0)
-        {
-            return 0;
-        }
-        else
-        {
-            return register_array_[index];
-        }
+        if (i != 0) r[i] = v;
     }
-
-    public void Write(int index, uint value)
-    {
-        if (index == 0)
-        {
-            return;
-        }
-
-        else
-        {
-            register_array_[index] = value;
-        }
-    }
-
 }
 
 class CPU
 {
-    private Memory mem;
-    private Registers regs;
-    private uint pc;
-
-    public CPU()
-    {
-        mem = new Memory();
-        regs = new Registers();
-        pc = 0;
-    }
+    private Memory mem = new Memory();
+    private Registers regs = new Registers();
+    private uint pc = 0;
 
     public uint PC => pc;
 
     public uint PeekInstruction() => mem.Read32((int)pc);
 
+    private static int SignExtend(uint value, int bits)
+    {
+        int shift = 32 - bits;
+        return ((int)(value << shift)) >> shift;
+    }
+
     public void Step()
     {
-        uint instruction = mem.Read32((int)pc);
+        uint inst = mem.Read32((int)pc);
 
-
-        uint opcode = instruction & 0x7F;
-        uint rd = (instruction >> 7) & 0x1F;
-        uint funct3 = (instruction >> 12) & 0x7;
-        uint rs1 = (instruction >> 15) & 0x1F;
-        uint rs2 = (instruction >> 20) & 0x1F;
-        uint funct7 = (instruction >> 25) & 0x7F;
+        uint opcode = inst & 0x7F;
+        uint rd = (inst >> 7) & 0x1F;
+        uint funct3 = (inst >> 12) & 0x7;
+        uint rs1 = (inst >> 15) & 0x1F;
+        uint rs2 = (inst >> 20) & 0x1F;
+        uint funct7 = (inst >> 25) & 0x7F;
 
         uint oldPc = pc;
         pc += 4;
 
         switch (opcode)
         {
-            case 0x33: //R-Type operations
-                uint val1 = regs.Read((int)rs1);
-                uint val2 = regs.Read((int)rs2);
-                
-                if (funct3 == 0x0) //Addition or subtraction
+            // ================= R TYPE =================
+            case 0x33:
+            {
+                uint a = regs.Read((int)rs1);
+                uint b = regs.Read((int)rs2);
+
+                switch (funct3)
                 {
-                    if (funct7 == 0x0)
-                    {
-                        regs.Write((int)rd, val1 + val2);
-                    }
-                    else if (funct7 == 0x20)
-                    {
-                        regs.Write((int)rd, val1 - val2);
-                    }
-                }
+                    case 0x0:
+                        regs.Write((int)rd, funct7 == 0x20 ? a - b : a + b);
+                        break;
 
-                else if (funct3 == 0x1) //Shift left logical
-                {
-                    int shiftAmount = (int)(val2 & 0x1F);
-                    regs.Write((int)rd, val1 << shiftAmount);
-                }
+                    case 0x1:
+                        regs.Write((int)rd, a << (int)(b & 0x1F));
+                        break;
 
-                else if (funct3 == 0x2) //Set less than(signed comparison)
-                {
-                    int s1 = (int)val1;
-                    int s2 = (int)val2;
-                    regs.Write((int)rd, s1 < s2 ? 1u : 0u);
-                }
+                    case 0x2:
+                        regs.Write((int)rd, (uint)((int)a < (int)b ? 1 : 0));
+                        break;
 
-                else if (funct3 == 0x3) //Set less than (unsigned comparison)
-                {
-                    regs.Write((int)rd, val1 < val2 ? 1u : 0u);
-                }
+                    case 0x3:
+                        regs.Write((int)rd, a < b ? 1u : 0u);
+                        break;
 
-                else if (funct3 == 0x4) //XOR
-                {
-                    regs.Write((int)rd, val1 ^ val2);
-                }
+                    case 0x4:
+                        regs.Write((int)rd, a ^ b);
+                        break;
 
-                else if (funct3 == 0x5) //Shift right Logical/Arithmetic
-                {
-                    int shiftAmount = (int)(val2 & 0x1F);
+                    case 0x5:
+                        regs.Write((int)rd,
+                            funct7 == 0x20
+                                ? (uint)((int)a >> (int)(b & 0x1F))
+                                : a >> (int)(b & 0x1F));
+                        break;
 
-                    if (funct7 == 0x00)
-                    {
-                        regs.Write((int)rd, val1 >> shiftAmount);
-                    }
+                    case 0x6:
+                        regs.Write((int)rd, a | b);
+                        break;
 
-                    else if (funct7 == 0x20)
-                    {
-                        int signedVal1 = (int)val1;
-                        regs.Write((int)rd, (uint)(signedVal1 >> shiftAmount));
-                    }
-                }
-
-                else if (funct3 == 0x6) //OR
-                {
-                    regs.Write((int)rd, val1 | val2);
-                }
-
-                else if (funct3 == 0x7) //AND
-                {
-                    regs.Write((int)rd, val1 & val2);
+                    case 0x7:
+                        regs.Write((int)rd, a & b);
+                        break;
                 }
                 break;
+            }
 
-            case 0x13: //I-Type operations
-            
-                uint i_val1 = regs.Read((int)rs1);
-                int imm = ((int)instruction) >> 20;
+            // ================= I TYPE =================
+            case 0x13:
+            {
+                uint a = regs.Read((int)rs1);
+                int imm = SignExtend(inst >> 20, 12);
 
-                if (funct3 == 0x0) //ADDI
+                int shamt = (int)((inst >> 20) & 0x1F);
+
+                switch (funct3)
                 {
-                    regs.Write((int)rd, (uint)((int)i_val1 + imm));
-                }
+                    case 0x0:
+                        regs.Write((int)rd, (uint)((int)a + imm));
+                        break;
 
-                else if (funct3 == 0x1) // SLLI
-                {
-                    int shamt = (int)(instruction >> 20) & 0x1F;
-                    regs.Write((int)rd, i_val1 << shamt);
-                }
+                    case 0x1:
+                        regs.Write((int)rd, a << shamt);
+                        break;
 
-                else if (funct3 == 0x2) // SLTI
-                {
-                    regs.Write((int)rd, (int)i_val1 < imm ? 1u : 0u);
-                }
+                    case 0x2:
+                        regs.Write((int)rd, (uint)((int)a < imm ? 1 : 0));
+                        break;
 
-                else if (funct3 == 0x3) // SLTIU
-                {
-                    regs.Write((int)rd, i_val1 < (uint)imm ? 1u : 0u);
-                }
+                    case 0x3:
+                        regs.Write((int)rd, a < (uint)imm ? 1u : 0u);
+                        break;
 
-                else if (funct3 == 0x4) // XORI
-                {
-                    regs.Write((int)rd, i_val1 ^ (uint)imm);
-                }
+                    case 0x4:
+                        regs.Write((int)rd, a ^ (uint)imm);
+                        break;
 
-                else if (funct3 == 0x5) // SRLI / SRAI
-                {
-                    int shamt = (int)(instruction >> 20) & 0x1F;
+                    case 0x5:
+                        regs.Write((int)rd,
+                            funct7 == 0x20
+                                ? (uint)((int)a >> shamt)
+                                : a >> shamt);
+                        break;
 
-                    if (funct7 == 0x00)
-                    {
-                        regs.Write((int)rd, i_val1 >> shamt);
-                    }
+                    case 0x6:
+                        regs.Write((int)rd, a | (uint)imm);
+                        break;
 
-                    else if (funct7 == 0x20)
-                    {
-                        regs.Write((int)rd, (uint)((int)i_val1 >> shamt));
-                    }
-                }
-
-                else if (funct3 == 0x6) //ORI
-                {
-                    regs.Write((int)rd, i_val1 | (uint)imm);
-                }
-
-                else if (funct3 == 0x7) //ANDI
-                {
-                    regs.Write((int)rd, i_val1 & (uint)imm);
-                }
-
-                break;
-
-            case 0x03: //I-Type Loads
-
-                int load_imm = ((int)instruction) >> 20;
-                uint load_addr = regs.Read((int)rs1) + (uint)load_imm;
-
-                if (funct3 == 0x0) // LB
-                {
-                    sbyte val8 = (sbyte)mem.Read8((int)load_addr);
-                    regs.Write((int)rd, (uint)((int)val8));
-                }
-
-                else if (funct3 == 0x1) // LH
-                {
-                    short val16 = (short)mem.Read16((int)load_addr);
-                    regs.Write((int)rd, (uint)((int)val16));
-                }
-
-                else if (funct3 == 0x2) // LW
-                {
-                    uint val32 = mem.Read32((int)load_addr);
-                    regs.Write((int)rd, val32);
-                }
-
-                else if (funct3 == 0x4) // LBU
-                {
-                    regs.Write((int)rd, mem.Read8((int)load_addr));
-                }
-
-                else if (funct3 == 0x5) // LHU
-                {
-                    regs.Write((int)rd, mem.Read16((int)load_addr));
+                    case 0x7:
+                        regs.Write((int)rd, a & (uint)imm);
+                        break;
                 }
                 break;
+            }
 
-            case 0x23: // S-Type Stores
+            // ================= LOAD =================
+            case 0x03:
+            {
+                int imm = SignExtend(inst >> 20, 12);
+                uint addr = (uint)((int)regs.Read((int)rs1) + imm);
 
-                int imm_s = ((int)(instruction & 0xFE000000) >> 20) | 
-                            ((int)(instruction >> 7) & 0x1F);
-                
-                imm_s = (imm_s << 20) >> 20;
-
-                            
-                uint store_addr = regs.Read((int)rs1) + (uint)imm_s;
-                uint val_to_store = regs.Read((int)rs2);
-
-                if (funct3 == 0x0) // SB
+                switch (funct3)
                 {
-                    mem.Write8((int)store_addr, val_to_store);
-                }
+                    case 0x0:
+                        regs.Write((int)rd, (uint)(sbyte)mem.Read8((int)addr));
+                        break;
 
-                else if (funct3 == 0x1) // SH
-                {
-                    mem.Write16((int)store_addr, val_to_store);
-                }
+                    case 0x1:
+                        regs.Write((int)rd, (uint)(short)mem.Read16((int)addr));
+                        break;
 
-                else if (funct3 == 0x2) // SW
-                {
-                    mem.Write32((int)store_addr, val_to_store);
+                    case 0x2:
+                        regs.Write((int)rd, mem.Read32((int)addr));
+                        break;
+
+                    case 0x4:
+                        regs.Write((int)rd, mem.Read8((int)addr));
+                        break;
+
+                    case 0x5:
+                        regs.Write((int)rd, mem.Read16((int)addr));
+                        break;
                 }
+                break;
+            }
+
+            // ================= STORE =================
+            case 0x23:
+            {
+                int imm =
+                    SignExtend(
+                        ((inst >> 25) << 5) | ((inst >> 7) & 0x1F),
+                        12
+                    );
+
+                uint addr = (uint)((int)regs.Read((int)rs1) + imm);
+                uint val = regs.Read((int)rs2);
+
+                switch (funct3)
+                {
+                    case 0x0:
+                        mem.Write8((int)addr, val);
+                        break;
+                    case 0x1:
+                        mem.Write16((int)addr, val);
+                        break;
+                    case 0x2:
+                        mem.Write32((int)addr, val);
+                        break;
+                }
+                break;
+            }
+
+            // ================= BRANCH =================
+            case 0x63:
+            {
+                uint a = regs.Read((int)rs1);
+                uint b = regs.Read((int)rs2);
+
+                bool take = funct3 switch
+                {
+                    0x0 => a == b,
+                    0x1 => a != b,
+                    0x4 => (int)a < (int)b,
+                    0x5 => (int)a >= (int)b,
+                    0x6 => a < b,
+                    0x7 => a >= b,
+                    _ => false
+                };
+
+                int imm =
+                    SignExtend(
+                        ((inst >> 31) << 12) |
+                        ((inst >> 7) & 0x1) << 11 |
+                        ((inst >> 25) & 0x3F) << 5 |
+                        ((inst >> 8) & 0xF) << 1,
+                        13
+                    );
+
+                if (take)
+                    pc = (uint)((int)oldPc + imm);
 
                 break;
+            }
 
-            case 0x63: // B-Type Branching Instructions
-
-                int imm_b = ((int)(instruction & 0x80000000) >> 19) |
-                            ((int)(instruction & 0x7E000000) >> 20) |
-                            ((int)(instruction & 0x00000F00) >> 7)  |
-                            ((int)(instruction & 0x00000080) << 4);
-                
-                imm_b = (imm_b << 19) >> 19;
-
-                imm_b <<= 1;
-                            
-    
-
-                uint b_val1 = regs.Read((int)rs1);
-                uint b_val2 = regs.Read((int)rs2);
-                bool take_branch = false;
-
-                if (funct3 == 0x0) // BEQ
-                {
-                    take_branch = (b_val1 == b_val2);
-                }
-
-                else if (funct3 == 0x1) // BNE
-                {
-                    take_branch = (b_val1 != b_val2);
-                }
-
-                else if (funct3 == 0x4) // BLT
-                {
-                    take_branch = ((int)b_val1 < (int)b_val2);
-                }
-
-                else if (funct3 == 0x5) // BGE
-                {
-                    take_branch = ((int)b_val1 >= (int)b_val2);
-                }
-
-                else if (funct3 == 0x6) // BLTU
-                {
-                    take_branch = (b_val1 < b_val2);
-                }
-
-                else if (funct3 == 0x7) // BGEU
-                {
-                    take_branch = (b_val1 >= b_val2);
-                }
-
-                if (take_branch)
-                {
-                    pc = (uint)((int)oldPc + imm_b);
-                }
-
+            // ================= LUI =================
+            case 0x37:
+                regs.Write((int)rd, inst & 0xFFFFF000);
                 break;
 
-            case 0x37: // LUI
-                regs.Write((int)rd, instruction & 0xFFFFF000);
+            // ================= AUIPC =================
+            case 0x17:
+                regs.Write((int)rd, (uint)((int)oldPc + (int)(inst & 0xFFFFF000)));
                 break;
 
-            case 0x17: // AUIPC
-
-                uint offset = instruction & 0xFFFFF000;
-                regs.Write((int)rd, (uint)((int)oldPc + (int)offset));
-                break;
-
-            case 0x6F: // JAL
-
-                int imm_j = ((int)(instruction & 0x80000000) >> 11) |
-                            ((int)(instruction & 0x7FE00000) >> 20) |
-                            ((int)(instruction & 0x00100000) >> 9)  | 
-                            (int)(instruction & 0x000FF000);
-
-                imm_j = (imm_j << 11) >> 11;
-
-                imm_j <<= 1;
-                              
+            // ================= JAL =================
+            case 0x6F:
+            {
+                int imm =
+                    SignExtend(
+                        ((inst >> 31) << 20) |
+                        ((inst >> 12) & 0xFF) << 12 |
+                        ((inst >> 20) & 0x1) << 11 |
+                        ((inst >> 21) & 0x3FF) << 1,
+                        21
+                    );
 
                 regs.Write((int)rd, pc);
-
-                pc = (uint)((int)oldPc + imm_j);
+                pc = (uint)((int)oldPc + imm);
                 break;
+            }
 
-            case 0x67: // JALR
-
-                int imm_jalr = ((int)instruction) >> 20;
-                uint target = (regs.Read((int)rs1) + (uint)imm_jalr) & ~1u;
+            // ================= JALR =================
+            case 0x67:
+            {
+                int imm = SignExtend(inst >> 20, 12);
+                uint target = (uint)((int)regs.Read((int)rs1) + imm) & ~1u;
 
                 regs.Write((int)rd, pc);
                 pc = target;
                 break;
-
-
+            }
 
             default:
-                Console.WriteLine("Unkown Opcode: " + opcode.ToString("X"));
+                Console.WriteLine($"Unknown opcode: {opcode:X}");
                 break;
         }
-
+        Console.WriteLine(
+    $"PC={oldPc:X}, opcode={opcode:X}, rd={rd}, rs1={rs1}, rs2={rs2}, funct3={funct3}, funct7={funct7}"
+);
     }
 
     public void DumpRegisters()
     {
         Console.WriteLine($"PC: 0x{pc:X8}");
-
-        for (int i = 0; i < 32; ++i)
+        for (int i = 0; i < 32; i++)
         {
-            Console.Write($"x{i}: {regs.Read(i),-10} ");
+            Console.Write($"x{i}: {regs.Read(i),-10}");
             if ((i + 1) % 4 == 0) Console.WriteLine();
         }
         Console.WriteLine("----------------------------------");
     }
 
-
     public void LoadProgram(byte[] program)
     {
-        for (int i = 0; i < program.Length; ++i)
-        {
+        for (int i = 0; i < program.Length; i++)
             mem.Write8(i, program[i]);
-        }
-    }
-
-    public void Run(int steps)
-    {
-        for (int i = 0; i < steps; ++i)
-        {
-            Step();
-        }
     }
 }
 
 class Program
 {
-    static void Main(string[] args)
+    static void Main()
     {
+        CPU cpu = new CPU();
 
-        if (args.Length == 0)
+        byte[] program = 
         {
-            Console.WriteLine("Please provide a path to a RISC-V binary file.");
-            Console.WriteLine("Usage: dotnet run <path_to_file.bin>");
-            return;
-        }
-
-        string filePath = args[0];
-
-        if (!File.Exists(filePath))
-        {
-            Console.WriteLine($"Error: File '{filePath}' not found.");
-            return;
-        }
-
-
-        CPU myCpu = new CPU();
-        byte[] program = new byte[]
-        {
-            0x93, 0x00, 0x50, 0x00, // ADDI x1, x0, 5
-            0x13, 0x01, 0xA0, 0x00, // ADDI x2, x0, 10
-            0xB3, 0x81, 0x20, 0x00, // ADD x3, x1, x2
+            0x93, 0x00, 0x00, 0xFF, // addi x1, x0, 20
+            0x13, 0x01, 0x20, 0x00, // addi x2, x0, 5
+            0x33, 0xD1, 0x20, 0x00,
+            0xB3, 0x52, 0x21, 0x40
         };
-        
-        myCpu.LoadProgram(program);
-        
+        cpu.LoadProgram(program);
 
-        Console.WriteLine($"---Loaded {program.Length} bytes . Starting Execution---");
+        Console.WriteLine($"Loaded {program.Length} bytes");
 
-        int maxSteps = 1000;
-
-        for (int i = 0; i < 5; ++i)
+        for (int i = 0; i < 3; i++)
         {
-            if (myCpu.PeekInstruction() == 0)
-            {
-                Console.WriteLine($"[HALT] Null instruction at 0x{myCpu.PC:X8}.");
-                break;
-            }
-
-            myCpu.Step();
-            myCpu.DumpRegisters();
+            if (cpu.PeekInstruction() == 0) break;
+            cpu.Step();
+            cpu.DumpRegisters();
         }
 
-        Console.WriteLine("---Execution Finished---");
+        Console.WriteLine("Done");
         Console.ReadLine();
     }
 }
