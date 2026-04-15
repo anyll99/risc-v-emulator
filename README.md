@@ -6,14 +6,30 @@ Simulates the core architecture of a 32-bit RISC-V CPU, which fetches, decodes a
 
 ## Key Features
 
-* **Complete RV32I Execution:** Supports the fundamental 32-bit instruction set.
-* **Virtual Register File:** Implements 32 general-purpose registers with hardware accurate 'x0' zero-register logic.
-* **Simulated Memory:** A 64 KB byte-addressable memory system supporting 8, 16 and 32 bit Load/Store operations.
-* **Instruction Pipeline logic:**
-  * **R-Type:** Arithmetic and logical operations such as (ADD, SUB, AND, OR, etc.)
-  * **I-Type:** Immediate math and Memory Loads
-  * **S-Type:** Memory Stores.
-  * **B-Type** Conditional Branching (loops and if-statements)
+* **Complete RV32I Execution:**
+  Implements the base integer instruction set, including arithmetic, logical, memory, and control flow operations
+  
+* **Virtual Register File:**
+  Implements 32 general-purpose registers with hardware accurate 'x0' zero-register logic.
+  
+* **Simulated Memory:**
+  A 64 KB byte-addressable memory system supporting 8, 16 and 32 bit Load/Store operations.
+  
+* **Instruction Categories:**
+  * **R-Type:** `ADD`, `SUB`, `AND`, `OR`, `XOR`, shifts, comparisons
+  * **I-Type:** Immediate arithmetic, loads, shifts
+  * **S-Type:** Store instructions
+  * **B-Type** Conditional Branching (`BEQ`, `BNE`, etc.)
+  * **U-Type** `LUI`, `AUIPC`
+  * **J-Type** `JAL`, `JALR`
+ 
+ * **Instruction Categories:**
+  * Basic `ECALL` support (exit, write)
+  * `EBREAK` handling for debugging
+
+ * **Debug mode**
+  * Step-by-step execution tracking
+  * Instruction-level logging 
 
 ## Internal Architecture
 
