@@ -374,4 +374,58 @@ class CPU
         }
 
     }
+
+    public void DumpRegisters()
+    {
+        Console.WriteLine($"PC: 0x{pc: X8}");
+
+        for (int i = 0; i < 32; ++i)
+        {
+            Console.Write($"x{i}: {regs.Read(i),-10} ");
+            if ((i + 1) % 4 == 0) Console.WriteLine();
+        }
+        Console.WriteLine("----------------------------------");
+    }
+
+
+    public void LoadProgram(byte[] program)
+    {
+        for (int i = 0; i < program.Length; ++i)
+        {
+            mem.Write8(i, program[i]);
+        }
+    }
+
+    public void Run(int steps)
+    {
+        for (int i = 0; i < steps; ++i)
+        {
+            Step();
+        }
+    }
+}
+
+class Program
+{
+    static void Main(string[] args)
+    {
+        CPU myCpu = new CPU();
+
+
+        byte[] program =
+        {
+            0x93, 0x00, 0x50, 0x00,
+            0x13, 0x01, 0xA0, 0x00,
+            0x33, 0x01, 0x20, 0x00
+        };
+
+        myCpu.LoadProgram(program);
+
+        Console.WriteLine("---Starting Execution---");
+
+        for (int i = 0; i < 5; ++i)
+        {
+            Console
+        }
+    }
 }
