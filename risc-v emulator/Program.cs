@@ -16,6 +16,9 @@
 
     public uint Read32(int address)
     {
+
+        if (address > byte_array_.Length - 4) return 0;
+
         return (uint)byte_array_[address] |
                 (uint)byte_array_[address + 1] << 8 |
                 (uint)byte_array_[address + 2] << 16 |
@@ -91,6 +94,10 @@ class CPU
         pc = 0;
     }
 
+    public uint PC => pc;
+
+    public uint PeekInstruction() => mem.Read32((int)pc);
+
     public void Step()
     {
         uint instruction = mem.Read32((int)pc);
@@ -103,6 +110,7 @@ class CPU
         uint rs2 = (instruction >> 20) & 0x1F;
         uint funct7 = (instruction >> 25) & 0x7F;
 
+        uint oldPc = pc;
         pc += 4;
 
         switch (opcode)
@@ -174,17 +182,18 @@ class CPU
                 break;
 
             case 0x13: //I-Type operations
+            
                 uint i_val1 = regs.Read((int)rs1);
                 int imm = ((int)instruction) >> 20;
 
                 if (funct3 == 0x0) //ADDI
                 {
-                    regs.Write((int)rd, (uint)(i_val1 + imm));
+                    regs.Write((int)rd, (uint)((int)i_val1 + imm));
                 }
 
                 else if (funct3 == 0x1) // SLLI
                 {
-                    int shamt = (int)rs2;
+                    int shamt = (int)(instruction >> 20) & 0x1F;
                     regs.Write((int)rd, i_val1 << shamt);
                 }
 
@@ -195,7 +204,7 @@ class CPU
 
                 else if (funct3 == 0x3) // SLTIU
                 {
-                    regs.Write((int)rd, (uint)i_val1 < imm ? 1u : 0u);
+                    regs.Write((int)rd, i_val1 < (uint)imm ? 1u : 0u);
                 }
 
                 else if (funct3 == 0x4) // XORI
@@ -205,7 +214,7 @@ class CPU
 
                 else if (funct3 == 0x5) // SRLI / SRAI
                 {
-                    int shamt = (int)rs2;
+                    int shamt = (int)(instruction >> 20) & 0x1F;
 
                     if (funct7 == 0x00)
                     {
@@ -266,7 +275,12 @@ class CPU
 
             case 0x23: // S-Type Stores
 
-                int imm_s = ((int)(instruction & 0xFE000000) >> 20 | (int)(instruction >> 7) & 0x1F);
+                int imm_s = ((int)(instruction & 0xFE000000) >> 20) | 
+                            ((int)(instruction >> 7) & 0x1F);
+                
+                imm_s = (imm_s << 20) >> 20;
+
+                            
                 uint store_addr = regs.Read((int)rs1) + (uint)imm_s;
                 uint val_to_store = regs.Read((int)rs2);
 
@@ -290,9 +304,15 @@ class CPU
             case 0x63: // B-Type Branching Instructions
 
                 int imm_b = ((int)(instruction & 0x80000000) >> 19) |
-                            ((int)(instruction & 0x00000080) << 4) |
                             ((int)(instruction & 0x7E000000) >> 20) |
-                            ((int)(instruction & 0x00000F00) >> 7);
+                            ((int)(instruction & 0x00000F00) >> 7)  |
+                            ((int)(instruction & 0x00000080) << 4);
+                
+                imm_b = (imm_b << 19) >> 19;
+
+                imm_b <<= 1;
+                            
+    
 
                 uint b_val1 = regs.Read((int)rs1);
                 uint b_val2 = regs.Read((int)rs2);
@@ -330,7 +350,7 @@ class CPU
 
                 if (take_branch)
                 {
-                    pc = (uint)((int)pc - 4 + imm_b);
+                    pc = (uint)((int)oldPc + imm_b);
                 }
 
                 break;
@@ -342,19 +362,24 @@ class CPU
             case 0x17: // AUIPC
 
                 uint offset = instruction & 0xFFFFF000;
-                regs.Write((int)rd, (uint)((int)pc - 4 + (int)offset));
+                regs.Write((int)rd, (uint)((int)oldPc + (int)offset));
                 break;
 
             case 0x6F: // JAL
 
                 int imm_j = ((int)(instruction & 0x80000000) >> 11) |
-                            (int)(instruction & 0xFF000)            |
-                            ((int)(instruction & 0x100000) >> 9)    |
-                            ((int)(instruction & 0x7FE00000) >> 20);
+                            ((int)(instruction & 0x7FE00000) >> 20) |
+                            ((int)(instruction & 0x00100000) >> 9)  | 
+                            (int)(instruction & 0x000FF000);
+
+                imm_j = (imm_j << 11) >> 11;
+
+                imm_j <<= 1;
+                              
 
                 regs.Write((int)rd, pc);
 
-                pc = (uint)((int)pc - 4 + imm_j);
+                pc = (uint)((int)oldPc + imm_j);
                 break;
 
             case 0x67: // JALR
@@ -377,7 +402,7 @@ class CPU
 
     public void DumpRegisters()
     {
-        Console.WriteLine($"PC: 0x{pc: X8}");
+        Console.WriteLine($"PC: 0x{pc:X8}");
 
         for (int i = 0; i < 32; ++i)
         {
@@ -409,23 +434,51 @@ class Program
 {
     static void Main(string[] args)
     {
-        CPU myCpu = new CPU();
 
-
-        byte[] program =
+        if (args.Length == 0)
         {
-            0x93, 0x00, 0x50, 0x00,
-            0x13, 0x01, 0xA0, 0x00,
-            0x33, 0x01, 0x20, 0x00
+            Console.WriteLine("Please provide a path to a RISC-V binary file.");
+            Console.WriteLine("Usage: dotnet run <path_to_file.bin>");
+            return;
+        }
+
+        string filePath = args[0];
+
+        if (!File.Exists(filePath))
+        {
+            Console.WriteLine($"Error: File '{filePath}' not found.");
+            return;
+        }
+
+
+        CPU myCpu = new CPU();
+        byte[] program = new byte[]
+        {
+            0x93, 0x00, 0x50, 0x00, // ADDI x1, x0, 5
+            0x13, 0x01, 0xA0, 0x00, // ADDI x2, x0, 10
+            0xB3, 0x81, 0x20, 0x00, // ADD x3, x1, x2
         };
-
+        
         myCpu.LoadProgram(program);
+        
 
-        Console.WriteLine("---Starting Execution---");
+        Console.WriteLine($"---Loaded {program.Length} bytes . Starting Execution---");
+
+        int maxSteps = 1000;
 
         for (int i = 0; i < 5; ++i)
         {
-            Console
+            if (myCpu.PeekInstruction() == 0)
+            {
+                Console.WriteLine($"[HALT] Null instruction at 0x{myCpu.PC:X8}.");
+                break;
+            }
+
+            myCpu.Step();
+            myCpu.DumpRegisters();
         }
+
+        Console.WriteLine("---Execution Finished---");
+        Console.ReadLine();
     }
 }
