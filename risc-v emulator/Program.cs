@@ -310,12 +310,12 @@ class CPU
 
                 else if (funct3 == 0x4) // BLT
                 {
-                    take_branch = ((int)b_val1 < b_val2);
+                    take_branch = ((int)b_val1 < (int)b_val2);
                 }
 
                 else if (funct3 == 0x5) // BGE
                 {
-                    take_branch = ((int)b_val1 == (int)b_val2);
+                    take_branch = ((int)b_val1 >= (int)b_val2);
                 }
 
                 else if (funct3 == 0x6) // BLTU
