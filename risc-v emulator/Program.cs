@@ -287,7 +287,7 @@ class CPU
 
                 break;
 
-            case 0x63:
+            case 0x63: // B-Type Branching Instructions
 
                 int imm_b = ((int)(instruction & 0x80000000) >> 19) |
                             ((int)(instruction & 0x00000080) << 4) |
@@ -334,6 +334,38 @@ class CPU
                 }
 
                 break;
+
+            case 0x37: // LUI
+                regs.Write((int)rd, instruction & 0xFFFFF000);
+                break;
+
+            case 0x17: // AUIPC
+
+                uint offset = instruction & 0xFFFFF000;
+                regs.Write((int)rd, (uint)((int)pc - 4 + (int)offset));
+                break;
+
+            case 0x6F: // JAL
+
+                int imm_j = ((int)(instruction & 0x80000000) >> 11) |
+                            (int)(instruction & 0xFF000)            |
+                            ((int)(instruction & 0x100000) >> 9)    |
+                            ((int)(instruction & 0x7FE00000) >> 20);
+
+                regs.Write((int)rd, pc);
+
+                pc = (uint)((int)pc - 4 + imm_j);
+                break;
+
+            case 0x67: // JALR
+
+                int imm_jalr = ((int)instruction) >> 20;
+                uint target = (regs.Read((int)rs1) + (uint)imm_jalr) & ~1u;
+
+                regs.Write((int)rd, pc);
+                pc = target;
+                break;
+
 
 
             default:
