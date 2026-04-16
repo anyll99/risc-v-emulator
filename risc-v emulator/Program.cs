@@ -441,35 +441,24 @@ class CPU
 
 class RiscVProgram
 {
-    static void Main()
+    static void Main(string[] args)
     {
+        if (args.Length == 0)
+        {
+            Console.WriteLine("Usage: dotnet run <path_to_assembly.bin>");
+            return;
+        }
+
+        byte[] program = File.ReadAllBytes(args[0]);
         CPU cpu = new CPU();
         cpu.Debug = true;
- 
-        // addi x1, x0, 20   → 0x01400093
-        // addi x2, x0, 5    → 0x00500113
-        // add  x3, x1, x2   → 0x002081B3   (x3 = 25)
-        // sub  x4, x1, x2   → 0x40208233   (x4 = 15)
-        // ebreak             → 0x00100073
-        byte[] program =
-        {
-            0x93, 0x00, 0x40, 0x01,  // addi x1, x0, 20
-            0x13, 0x01, 0x50, 0x00,  // addi x2, x0, 5
-            0xB3, 0x81, 0x20, 0x00,  // add  x3, x1, x2
-            0x33, 0x82, 0x20, 0x40,  // sub  x4, x1, x2
-            0x73, 0x00, 0x10, 0x00,  // ebreak
-        };
- 
         cpu.LoadProgram(program);
-        Console.WriteLine($"Loaded {program.Length} bytes");
-        Console.WriteLine();
- 
+
         while (!cpu.Halted)
+        {
             cpu.Step();
- 
-        Console.WriteLine();
+        }
+
         cpu.DumpRegisters();
-        Console.WriteLine("Done");
-        Console.ReadLine();
     }
 }
