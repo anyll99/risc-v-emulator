@@ -14,21 +14,33 @@ class Memory
 
     public uint Read8(int address)
     {
-        if (!InBounds(address, 1)) return 0;
+        if (!InBounds(address, 1))
+        {
+            Console.WriteLine($"Warning: out-of-bounds read at address 0x{address:X8}");
+            return 0;
+        }
         return byte_array_[address];
+        
     }
 
     public uint Read16(int address)
     {
-        if (!InBounds(address, 2)) return 0;
-        return (uint)(byte_array_[address] |
-                (byte_array_[address + 1] << 8));
+        if (!InBounds(address, 2))
+        {
+            Console.WriteLine($"Warning: out-of-bounds read at address 0x{address:X8}");
+            return 0;
+        }
+        return (uint)(byte_array_[address] | (byte_array_[address + 1] << 8));
     }
 
 
     public uint Read32(int address)
     {
-        if (!InBounds(address, 4)) return 0;
+        if (!InBounds(address, 4))
+        {
+            Console.WriteLine($"Warning: out-of-bounds read at address 0x{address:X8}");
+            return 0;
+        }
         return (uint)(
             byte_array_[address] |
             (byte_array_[address + 1] << 8) |
@@ -39,20 +51,32 @@ class Memory
 
     public void Write8(int address, uint value)
     {
-        if (!InBounds(address, 1)) return;
+        if (!InBounds(address, 1))
+        {
+            Console.WriteLine($"Warning: out-of-bounds write at address 0x{address:X8}");
+            return;
+        }
         byte_array_[address] = (byte)value;
     }
 
     public void Write16(int address, uint value)
     {
-        if (!InBounds(address, 2)) return;
+        if (!InBounds(address, 2))
+        {
+            Console.WriteLine($"Warning: out-of-bounds write at address 0x{address:X8}");
+            return;
+        }
         byte_array_[address] = (byte)value;
         byte_array_[address + 1] = (byte)(value >> 8);
     }
 
     public void Write32(int address, uint value)
     {
-        if (!InBounds(address, 4)) return;
+        if (!InBounds(address, 4))
+        {
+            Console.WriteLine($"Warning: out-of-bounds write at address 0x{address:X8}");
+            return;
+        }
         byte_array_[address] = (byte)value;
         byte_array_[address + 1] = (byte)(value >> 8);
         byte_array_[address + 2] = (byte)(value >> 16);
