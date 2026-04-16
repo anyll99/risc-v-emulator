@@ -449,11 +449,38 @@ class RiscVProgram
             return;
         }
 
-        byte[] program = File.ReadAllBytes(args[0]);
+        string path = args[0];
+
+        if (!File.Exists(path))
+        {
+            Console.WriteLine($"Error: file '{path}' not found.");
+            return;
+        }
+
+
+
+        byte[] program;
+        try
+        {
+            program = File.ReadAllBytes(path);
+        }
+
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error reading file: {ex.Message}");
+            return;
+        }
+
+        if (program.Length == 0)
+        {
+            Console.WriteLine("Error: binary file is empty.");
+            return;
+        }
+
         CPU cpu = new CPU();
-        cpu.Debug = true;
         cpu.LoadProgram(program);
 
+  
         while (!cpu.Halted)
         {
             cpu.Step();
