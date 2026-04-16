@@ -3,6 +3,7 @@
 class Memory
 {
     private byte[] byte_array_;
+    public bool Silent = false;
 
     public Memory(int size = 65536)
     {
@@ -16,29 +17,27 @@ class Memory
     {
         if (!InBounds(address, 1))
         {
-            Console.WriteLine($"Warning: out-of-bounds read at address 0x{address:X8}");
+            if (!Silent) Console.WriteLine($"Warning: out-of-bounds read at address 0x{address:X8}");
             return 0;
         }
         return byte_array_[address];
-        
     }
 
     public uint Read16(int address)
     {
         if (!InBounds(address, 2))
         {
-            Console.WriteLine($"Warning: out-of-bounds read at address 0x{address:X8}");
+            if (!Silent) Console.WriteLine($"Warning: out-of-bounds read at address 0x{address:X8}");
             return 0;
         }
         return (uint)(byte_array_[address] | (byte_array_[address + 1] << 8));
     }
 
-
     public uint Read32(int address)
     {
         if (!InBounds(address, 4))
         {
-            Console.WriteLine($"Warning: out-of-bounds read at address 0x{address:X8}");
+            if (!Silent) Console.WriteLine($"Warning: out-of-bounds read at address 0x{address:X8}");
             return 0;
         }
         return (uint)(
@@ -53,7 +52,7 @@ class Memory
     {
         if (!InBounds(address, 1))
         {
-            Console.WriteLine($"Warning: out-of-bounds write at address 0x{address:X8}");
+            if (!Silent) Console.WriteLine($"Warning: out-of-bounds write at address 0x{address:X8}");
             return;
         }
         byte_array_[address] = (byte)value;
@@ -63,7 +62,7 @@ class Memory
     {
         if (!InBounds(address, 2))
         {
-            Console.WriteLine($"Warning: out-of-bounds write at address 0x{address:X8}");
+            if (!Silent) Console.WriteLine($"Warning: out-of-bounds write at address 0x{address:X8}");
             return;
         }
         byte_array_[address] = (byte)value;
@@ -74,7 +73,7 @@ class Memory
     {
         if (!InBounds(address, 4))
         {
-            Console.WriteLine($"Warning: out-of-bounds write at address 0x{address:X8}");
+            if (!Silent) Console.WriteLine($"Warning: out-of-bounds write at address 0x{address:X8}");
             return;
         }
         byte_array_[address] = (byte)value;
@@ -98,12 +97,18 @@ class Registers
 
 class CPU
 {
-    private Memory mem = new Memory();
+    private Memory mem;
     private Registers regs = new Registers();
     private uint pc = 0;
     public bool Debug = false;
     public bool Halted { get; private set; } = false;
-    
+
+    private bool _silent = false;
+    public bool Silent
+    {
+        get => _silent;
+        set { _silent = value; mem.Silent = value; }
+    }
 
     private const uint OP_R_TYPE = 0x33;
     private const uint OP_I_TYPE = 0x13;
@@ -135,16 +140,15 @@ class CPU
 
     public void Step()
     {
-
         if (Halted) return;
 
         uint inst = mem.Read32((int)pc);
 
         uint opcode = inst & 0x7F;
-        uint rd     = (inst >> 7) & 0x1F;
+        uint rd = (inst >> 7) & 0x1F;
         uint funct3 = (inst >> 12) & 0x7;
-        uint rs1    = (inst >> 15) & 0x1F;
-        uint rs2    = (inst >> 20) & 0x1F;
+        uint rs1 = (inst >> 15) & 0x1F;
+        uint rs2 = (inst >> 20) & 0x1F;
         uint funct7 = (inst >> 25) & 0x7F;
 
         uint oldPc = pc;
@@ -154,186 +158,186 @@ class CPU
         {
             // ================= R TYPE =================
             case OP_R_TYPE:
-            {
-                uint a = regs.Read((int)rs1);
-                uint b = regs.Read((int)rs2);
-
-                switch (funct3)
                 {
-                    case 0x0:
-                        regs.Write((int)rd, funct7 == 0x20 ? a - b : a + b);
-                        break;
+                    uint a = regs.Read((int)rs1);
+                    uint b = regs.Read((int)rs2);
 
-                    case 0x1:
-                        regs.Write((int)rd, a << (int)(b & 0x1F));
-                        break;
+                    switch (funct3)
+                    {
+                        case 0x0:
+                            regs.Write((int)rd, funct7 == 0x20 ? a - b : a + b);
+                            break;
 
-                    case 0x2:
-                        regs.Write((int)rd, (uint)((int)a < (int)b ? 1 : 0));
-                        break;
+                        case 0x1:
+                            regs.Write((int)rd, a << (int)(b & 0x1F));
+                            break;
 
-                    case 0x3:
-                        regs.Write((int)rd, a < b ? 1u : 0u);
-                        break;
+                        case 0x2:
+                            regs.Write((int)rd, (uint)((int)a < (int)b ? 1 : 0));
+                            break;
 
-                    case 0x4:
-                        regs.Write((int)rd, a ^ b);
-                        break;
+                        case 0x3:
+                            regs.Write((int)rd, a < b ? 1u : 0u);
+                            break;
 
-                    case 0x5:
-                        regs.Write((int)rd,
-                            funct7 == 0x20
-                                ? (uint)((int)a >> (int)(b & 0x1F))
-                                : a >> (int)(b & 0x1F));
-                        break;
+                        case 0x4:
+                            regs.Write((int)rd, a ^ b);
+                            break;
 
-                    case 0x6:
-                        regs.Write((int)rd, a | b);
-                        break;
+                        case 0x5:
+                            regs.Write((int)rd,
+                                funct7 == 0x20
+                                    ? (uint)((int)a >> (int)(b & 0x1F))
+                                    : a >> (int)(b & 0x1F));
+                            break;
 
-                    case 0x7:
-                        regs.Write((int)rd, a & b);
-                        break;
+                        case 0x6:
+                            regs.Write((int)rd, a | b);
+                            break;
+
+                        case 0x7:
+                            regs.Write((int)rd, a & b);
+                            break;
+                    }
+                    break;
                 }
-                break;
-            }
 
             // ================= I TYPE =================
             case OP_I_TYPE:
-            {
-                uint a = regs.Read((int)rs1);
-                int imm = SignExtend(inst >> 20, 12);
-                int shamt = (int)((inst >> 20) & 0x1F);
-
-                switch (funct3)
                 {
-                    case 0x0:
-                        regs.Write((int)rd, (uint)((int)a + imm));
-                        break;
+                    uint a = regs.Read((int)rs1);
+                    int imm = SignExtend(inst >> 20, 12);
+                    int shamt = (int)((inst >> 20) & 0x1F);
 
-                    case 0x1:
-                        regs.Write((int)rd, a << shamt);
-                        break;
+                    switch (funct3)
+                    {
+                        case 0x0:
+                            regs.Write((int)rd, (uint)((int)a + imm));
+                            break;
 
-                    case 0x2:
-                        regs.Write((int)rd, (uint)((int)a < imm ? 1 : 0));
-                        break;
+                        case 0x1:
+                            regs.Write((int)rd, a << shamt);
+                            break;
 
-                    case 0x3:
-                        regs.Write((int)rd, a < (uint)imm ? 1u : 0u);
-                        break;
+                        case 0x2:
+                            regs.Write((int)rd, (uint)((int)a < imm ? 1 : 0));
+                            break;
 
-                    case 0x4:
-                        regs.Write((int)rd, a ^ (uint)imm);
-                        break;
+                        case 0x3:
+                            regs.Write((int)rd, a < (uint)imm ? 1u : 0u);
+                            break;
 
-                    case 0x5:
-                        regs.Write((int)rd,
-                            funct7 == 0x20
-                                ? (uint)((int)a >> shamt)
-                                : a >> shamt);
-                        break;
+                        case 0x4:
+                            regs.Write((int)rd, a ^ (uint)imm);
+                            break;
 
-                    case 0x6:
-                        regs.Write((int)rd, a | (uint)imm);
-                        break;
+                        case 0x5:
+                            regs.Write((int)rd,
+                                funct7 == 0x20
+                                    ? (uint)((int)a >> shamt)
+                                    : a >> shamt);
+                            break;
 
-                    case 0x7:
-                        regs.Write((int)rd, a & (uint)imm);
-                        break;
+                        case 0x6:
+                            regs.Write((int)rd, a | (uint)imm);
+                            break;
+
+                        case 0x7:
+                            regs.Write((int)rd, a & (uint)imm);
+                            break;
+                    }
+                    break;
                 }
-                break;
-            }
 
             // ================= LOAD =================
             case OP_LOAD:
-            {
-                int imm = SignExtend(inst >> 20, 12);
-                uint addr = (uint)((int)regs.Read((int)rs1) + imm);
-
-                switch (funct3)
                 {
-                    case 0x0:
-                        regs.Write((int)rd, (uint)(sbyte)mem.Read8((int)addr));
-                        break;
+                    int imm = SignExtend(inst >> 20, 12);
+                    uint addr = (uint)((int)regs.Read((int)rs1) + imm);
 
-                    case 0x1:
-                        regs.Write((int)rd, (uint)(short)mem.Read16((int)addr));
-                        break;
+                    switch (funct3)
+                    {
+                        case 0x0:
+                            regs.Write((int)rd, (uint)(sbyte)mem.Read8((int)addr));
+                            break;
 
-                    case 0x2:
-                        regs.Write((int)rd, mem.Read32((int)addr));
-                        break;
+                        case 0x1:
+                            regs.Write((int)rd, (uint)(short)mem.Read16((int)addr));
+                            break;
 
-                    case 0x4:
-                        regs.Write((int)rd, mem.Read8((int)addr));
-                        break;
+                        case 0x2:
+                            regs.Write((int)rd, mem.Read32((int)addr));
+                            break;
 
-                    case 0x5:
-                        regs.Write((int)rd, mem.Read16((int)addr));
-                        break;
+                        case 0x4:
+                            regs.Write((int)rd, mem.Read8((int)addr));
+                            break;
+
+                        case 0x5:
+                            regs.Write((int)rd, mem.Read16((int)addr));
+                            break;
+                    }
+                    break;
                 }
-                break;
-            }
 
             // ================= STORE =================
             case OP_STORE:
-            {
-                int imm =
-                    SignExtend(
-                        ((inst >> 25) << 5) | ((inst >> 7) & 0x1F),
-                        12
-                    );
-
-                uint addr = (uint)((int)regs.Read((int)rs1) + imm);
-                uint val = regs.Read((int)rs2);
-
-                switch (funct3)
                 {
-                    case 0x0:
-                        mem.Write8((int)addr, val);
-                        break;
-                    case 0x1:
-                        mem.Write16((int)addr, val);
-                        break;
-                    case 0x2:
-                        mem.Write32((int)addr, val);
-                        break;
+                    int imm =
+                        SignExtend(
+                            ((inst >> 25) << 5) | ((inst >> 7) & 0x1F),
+                            12
+                        );
+
+                    uint addr = (uint)((int)regs.Read((int)rs1) + imm);
+                    uint val = regs.Read((int)rs2);
+
+                    switch (funct3)
+                    {
+                        case 0x0:
+                            mem.Write8((int)addr, val);
+                            break;
+                        case 0x1:
+                            mem.Write16((int)addr, val);
+                            break;
+                        case 0x2:
+                            mem.Write32((int)addr, val);
+                            break;
+                    }
+                    break;
                 }
-                break;
-            }
 
             // ================= BRANCH =================
             case OP_BRANCH:
-            {
-                uint a = regs.Read((int)rs1);
-                uint b = regs.Read((int)rs2);
-
-                bool take = funct3 switch
                 {
-                    0x0 => a == b,
-                    0x1 => a != b,
-                    0x4 => (int)a < (int)b,
-                    0x5 => (int)a >= (int)b,
-                    0x6 => a < b,
-                    0x7 => a >= b,
-                    _ => false
-                };
+                    uint a = regs.Read((int)rs1);
+                    uint b = regs.Read((int)rs2);
 
-                int imm =
-                    SignExtend(
-                        ((inst >> 31) << 12) |
-                        ((inst >> 7) & 0x1) << 11 |
-                        ((inst >> 25) & 0x3F) << 5 |
-                        ((inst >> 8) & 0xF) << 1,
-                        13
-                    );
+                    bool take = funct3 switch
+                    {
+                        0x0 => a == b,
+                        0x1 => a != b,
+                        0x4 => (int)a < (int)b,
+                        0x5 => (int)a >= (int)b,
+                        0x6 => a < b,
+                        0x7 => a >= b,
+                        _ => false
+                    };
 
-                if (take)
-                    pc = (uint)((int)oldPc + imm);
+                    int imm =
+                        SignExtend(
+                            ((inst >> 31) << 12) |
+                            ((inst >> 7) & 0x1) << 11 |
+                            ((inst >> 25) & 0x3F) << 5 |
+                            ((inst >> 8) & 0xF) << 1,
+                            13
+                        );
 
-                break;
-            }
+                    if (take)
+                        pc = (uint)((int)oldPc + imm);
+
+                    break;
+                }
 
             // ================= LUI =================
             case OP_LUI:
@@ -347,66 +351,65 @@ class CPU
 
             // ================= JAL =================
             case OP_JAL:
-            {
-                int imm =
-                    SignExtend(
-                        ((inst >> 31) << 20) |
-                        ((inst >> 12) & 0xFF) << 12 |
-                        ((inst >> 20) & 0x1) << 11 |
-                        ((inst >> 21) & 0x3FF) << 1,
-                        21
-                    );
+                {
+                    int imm =
+                        SignExtend(
+                            ((inst >> 31) << 20) |
+                            ((inst >> 12) & 0xFF) << 12 |
+                            ((inst >> 20) & 0x1) << 11 |
+                            ((inst >> 21) & 0x3FF) << 1,
+                            21
+                        );
 
-                regs.Write((int)rd, pc);
-                pc = (uint)((int)oldPc + imm);
-                break;
-            }
+                    regs.Write((int)rd, pc);
+                    pc = (uint)((int)oldPc + imm);
+                    break;
+                }
 
             // ================= JALR =================
             case OP_JALR:
-            {
-                int imm = SignExtend(inst >> 20, 12);
-                uint target = (uint)((int)regs.Read((int)rs1) + imm) & ~1u;
+                {
+                    int imm = SignExtend(inst >> 20, 12);
+                    uint target = (uint)((int)regs.Read((int)rs1) + imm) & ~1u;
 
-                regs.Write((int)rd, pc);
-                pc = target;
-                break;
-            }
+                    regs.Write((int)rd, pc);
+                    pc = target;
+                    break;
+                }
 
             case OP_SYSTEM:
-            {
-                uint funct12 = inst >> 20;
-
-                switch (funct12)
                 {
-                    case 0x000:
-                        HandleEcall();
-                        break;
-                    
-                    case 0x001:
-                        Console.WriteLine("EBREAK hit - halting.");
-                        Halted = true;
-                        break;
-                    
-                    default:
-                        Console.WriteLine($"Unhandled SYSTEM funct12: 0x{funct12:X3}");
-                        break;
+                    uint funct12 = inst >> 20;
+
+                    switch (funct12)
+                    {
+                        case 0x000:
+                            HandleEcall();
+                            break;
+
+                        case 0x001:
+                            if (!Silent) Console.WriteLine("EBREAK hit - halting.");
+                            Halted = true;
+                            break;
+
+                        default:
+                            if (!Silent) Console.WriteLine($"Unhandled SYSTEM funct12: 0x{funct12:X3}");
+                            break;
+                    }
+                    break;
                 }
-                break;
-            }
 
             default:
-                Console.WriteLine($"Unknown opcode: 0x{opcode:X2} at PC=0x{oldPc:X8}");
+                if (!Silent) Console.WriteLine($"Unknown opcode: 0x{opcode:X2} at PC=0x{oldPc:X8}");
                 Halted = true;
                 break;
-        
         }
 
         if (Debug)
         {
             Console.WriteLine(
-                $"PC=0x{oldPc:X8} op=0x{opcode:X2} rd={rd, -2} " +
-                $"rs1={rs1, -2} rs2={rs2, -2} f3={funct3} f7=0x{funct7:X2}"
+                $"PC=0x{oldPc:X8} op=0x{opcode:X2} rd={rd,-2} " +
+                $"rs1={rs1,-2} rs2={rs2,-2} f3={funct3} f7=0x{funct7:X2}"
             );
         }
     }
@@ -419,28 +422,28 @@ class CPU
         {
             case 93:
                 uint exitCode = regs.Read(10);
-                Console.WriteLine($"ECALL exit({exitCode})");
+                if (!Silent) Console.WriteLine($"ECALL exit({exitCode})");
                 Halted = true;
                 break;
-            
-            case 64:
-            {
-                uint fd = regs.Read(10);
-                uint buf = regs.Read(11);
-                uint count = regs.Read(12);
 
-                if (fd == 1 || fd == 2)
+            case 64:
                 {
-                    for (uint i = 0; i < count; ++i)
-                        Console.Write((char)mem.Read8((int)(buf + i)));
+                    uint fd = regs.Read(10);
+                    uint buf = regs.Read(11);
+                    uint count = regs.Read(12);
+
+                    if (fd == 1 || fd == 2)
+                    {
+                        for (uint i = 0; i < count; ++i)
+                            Console.Write((char)mem.Read8((int)(buf + i)));
+                    }
+
+                    regs.Write(10, count);
+                    break;
                 }
 
-                regs.Write(10, count);
-                break;
-            }
-
             default:
-                Console.WriteLine($"Unhandled ECALL syscall={syscall}");
+                if (!Silent) Console.WriteLine($"Unhandled ECALL syscall={syscall}");
                 break;
         }
     }
@@ -465,8 +468,7 @@ class CPU
 
 class RiscVProgram
 {
-
-static void Main(string[] args)
+    static void Main(string[] args)
     {
         if (args.Length == 0)
         {
@@ -525,7 +527,5 @@ static void Main(string[] args)
         }
 
         cpu.DumpRegisters();
-
-
     }
 }
