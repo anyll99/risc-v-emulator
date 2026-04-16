@@ -465,11 +465,19 @@ class CPU
 
 class RiscVProgram
 {
-    static void Main(string[] args)
+
+static void Main(string[] args)
     {
         if (args.Length == 0)
         {
             Console.WriteLine("Usage: dotnet run <path_to_assembly.bin>");
+            Console.WriteLine("       dotnet run --test");
+            return;
+        }
+
+        if (args[0] == "--test")
+        {
+            Tests.Run();
             return;
         }
 
@@ -481,14 +489,11 @@ class RiscVProgram
             return;
         }
 
-
-
         byte[] program;
         try
         {
             program = File.ReadAllBytes(path);
         }
-
         catch (Exception ex)
         {
             Console.WriteLine($"Error reading file: {ex.Message}");
@@ -504,12 +509,23 @@ class RiscVProgram
         CPU cpu = new CPU();
         cpu.LoadProgram(program);
 
-  
-        while (!cpu.Halted)
+        const int maxSteps = 1_000_000;
+        int steps = 0;
+
+        while (!cpu.Halted && steps < maxSteps)
         {
             cpu.Step();
+            steps++;
+        }
+
+        if (!cpu.Halted)
+        {
+            Console.WriteLine("Error: execution limit reached, possible infinite loop.");
+            Console.WriteLine($"Last PC: 0x{cpu.PC:X8}");
         }
 
         cpu.DumpRegisters();
+
+
     }
 }
