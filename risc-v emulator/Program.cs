@@ -451,11 +451,19 @@ class CPU
     public void DumpRegisters()
     {
         Console.WriteLine($"PC: 0x{pc:X8}");
-        for (int i = 0; i < 32; i++)
+        Console.WriteLine("----------------------------------");
+        bool anyNonZero = false;
+        for (int i = 1; i < 32; i++)
         {
-            Console.Write($"x{i}: {regs.Read(i),-12}");
-            if ((i + 1) % 4 == 0) Console.WriteLine();
+            uint val = regs.Read(i);
+            if (val != 0)
+            {
+                Console.WriteLine($"x{i,-2}  {val,-12} (0x{val:X8})");
+                anyNonZero = true;
+            }
         }
+        if (!anyNonZero)
+            Console.WriteLine("all registers are zero");
         Console.WriteLine("----------------------------------");
     }
 
