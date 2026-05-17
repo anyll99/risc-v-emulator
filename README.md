@@ -21,8 +21,8 @@ dotnet run --test
 To produce a binary from a RISC-V assembly file, you need the [riscv-none-elf-gcc toolchain](https://github.com/xpack-binutils/riscv-none-elf-gcc/releases). Then run:
 
 ```bash
-riscv-none-elf-as -march=rv32i -mabi=ilp32 -o program.o program.s
-riscv-none-elf-objcopy -O binary program.o program.bin
+riscv-none-elf-gcc -march=rv32i -mabi=ilp32 -nostdlib -static -T link.ld program.s -o program.elf
+riscv-none-elf-objcopy -O binary program.elf program.bin
 ```
 
 ## Features
@@ -71,9 +71,34 @@ The CPU follows the standard fetch-decode-execute cycle:
 2. **Decode** — extracts the opcode, registers, and immediates using bitwise masking
 3. **Execute** — performs the operation and updates the PC, registers, or memory
 
+## Sample Programs
+
+The `samples/` folder contains example RISC-V assembly programs you can build and run:
+
+| File | Description | Expected result |
+|---|---|---|
+| `hello.s` | Prints "Hello, World!" to stdout | `Hello, World!` printed |
+| `sum.s` | Sums integers from 1 to 10 | `a0 = 55` in register dump |
+| `fibonacci.s` | Computes the 10th Fibonacci number | `a0 = 55` in register dump |
+
+To build all samples, run the build script from inside the `samples/` folder:
+
+```powershell
+cd samples
+.\build.ps1
+```
+
+Then run a binary from the project directory:
+
+```
+dotnet run ..\samples\hello.bin
+dotnet run ..\samples\sum.bin
+dotnet run ..\samples\fibonacci.bin
+```
+
 ## Testing
 
-The emulator includes a built-in test suite covering all major instruction types. Run it with:
+The emulator includes a built-in test suite covering all major RV32I instruction types. Run it with:
 
 ```
 dotnet run --test
@@ -92,8 +117,23 @@ PASS: LUI x3=0x1000
 PASS: BEQ taken x1 still 5
 PASS: SW/LW x2=39
 PASS: JAL skips x1=2
+PASS: ADDI x1=-1
+PASS: SLLI x2=16
+PASS: SRLI x2=4
+PASS: SRAI x2=-2
+PASS: SLT -1<1=1
+PASS: SLTU 1<0xFFFFFFFF=1
+PASS: BNE taken x1 still 5
+PASS: BLT taken x1 still 3
+PASS: BGE taken x1 still 7
+PASS: BLTU taken x2 still 1
+PASS: SB/LBU x2=200
+PASS: SB/LB x2=-1
+PASS: AUIPC x1=0x1000
+PASS: JALR x2=8
+PASS: JALR x3 skipped=0
 
-11 passed, 0 failed.
+26 passed, 0 failed.
 ```
 
 ## Requirements
