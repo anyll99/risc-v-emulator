@@ -1,10 +1,12 @@
 ﻿using System;
 
+/// <summary>Flat byte-addressable memory with bounds-checked reads and writes.</summary>
 class Memory
 {
     private byte[] byte_array_;
     public bool Silent = false;
 
+    /// <summary>Allocates memory of the given size in bytes. Defaults to 64KB.</summary>
     public Memory(int size = 65536)
     {
         byte_array_ = new byte[size];
@@ -13,6 +15,7 @@ class Memory
     private bool InBounds(int address, int width)
         => address >= 0 && address <= byte_array_.Length - width;
 
+    /// <summary>Reads an unsigned byte from the given address.</summary>
     public uint Read8(int address)
     {
         if (!InBounds(address, 1))
@@ -23,6 +26,7 @@ class Memory
         return byte_array_[address];
     }
 
+    /// <summary>Reads an unsigned 16-bit little-endian halfword from the given address.</summary>
     public uint Read16(int address)
     {
         if (!InBounds(address, 2))
@@ -33,6 +37,7 @@ class Memory
         return (uint)(byte_array_[address] | (byte_array_[address + 1] << 8));
     }
 
+    /// <summary>Reads an unsigned 32-bit little-endian word from the given address.</summary>
     public uint Read32(int address)
     {
         if (!InBounds(address, 4))
@@ -48,6 +53,7 @@ class Memory
         );
     }
 
+    /// <summary>Writes the low byte of <paramref name="value"/> to the given address.</summary>
     public void Write8(int address, uint value)
     {
         if (!InBounds(address, 1))
@@ -58,6 +64,7 @@ class Memory
         byte_array_[address] = (byte)value;
     }
 
+    /// <summary>Writes the low 16 bits of <paramref name="value"/> as a little-endian halfword.</summary>
     public void Write16(int address, uint value)
     {
         if (!InBounds(address, 2))
@@ -69,6 +76,7 @@ class Memory
         byte_array_[address + 1] = (byte)(value >> 8);
     }
 
+    /// <summary>Writes <paramref name="value"/> as a little-endian word to the given address.</summary>
     public void Write32(int address, uint value)
     {
         if (!InBounds(address, 4))
@@ -83,18 +91,22 @@ class Memory
     }
 }
 
+/// <summary>The 32 general-purpose RISC-V integer registers. x0 is hardwired to zero.</summary>
 class Registers
 {
     private uint[] r = new uint[32];
 
+    /// <summary>Returns the value of register <paramref name="i"/>. Always returns 0 for x0.</summary>
     public uint Read(int i) => i == 0 ? 0 : r[i];
 
+    /// <summary>Writes <paramref name="v"/> to register <paramref name="i"/>. Writes to x0 are silently discarded.</summary>
     public void Write(int i, uint v)
     {
         if (i != 0) r[i] = v;
     }
 }
 
+/// <summary>RV32I CPU. Executes one instruction per <see cref="Step"/> call.</summary>
 class CPU
 {
     private Memory mem;
@@ -121,6 +133,7 @@ class CPU
     private const uint OP_JALR = 0x67;
     private const uint OP_SYSTEM = 0x73;
 
+    /// <summary>Creates a CPU with a fresh memory of <paramref name="memorySize"/> bytes.</summary>
     public CPU(int memorySize = 65536)
     {
         mem = new Memory(memorySize);
@@ -138,6 +151,7 @@ class CPU
         return ((int)(value << shift)) >> shift;
     }
 
+    /// <summary>Fetches, decodes, and executes one instruction. Does nothing if <see cref="Halted"/> is true.</summary>
     public void Step()
     {
         if (Halted) return;
@@ -346,7 +360,7 @@ class CPU
 
             // ================= AUIPC =================
             case OP_AUIPC:
-                regs.Write((int)rd, (uint)((int)oldPc + (int)(inst & 0xFFFFF000)));
+                regs.Write((int)rd, oldPc + (inst & 0xFFFFF000));
                 break;
 
             // ================= JAL =================
@@ -448,6 +462,7 @@ class CPU
         }
     }
 
+    /// <summary>Prints PC and all non-zero registers to stdout.</summary>
     public void DumpRegisters()
     {
         Console.WriteLine($"PC: 0x{pc:X8}");
@@ -467,6 +482,7 @@ class CPU
         Console.WriteLine("----------------------------------");
     }
 
+    /// <summary>Copies <paramref name="program"/> into memory starting at <paramref name="loadAddress"/>.</summary>
     public void LoadProgram(byte[] program, uint loadAddress = 0)
     {
         for (int i = 0; i < program.Length; i++)
