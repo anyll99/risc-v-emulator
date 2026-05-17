@@ -81,19 +81,17 @@ The `samples/` folder contains example RISC-V assembly programs you can build an
 | `sum.s` | Sums integers from 1 to 10 | `a0 = 55` in register dump |
 | `fibonacci.s` | Computes the 10th Fibonacci number | `a0 = 55` in register dump |
 
-To build all samples, run the build script from inside the `samples/` folder:
+To build a sample, compile it with the toolchain from inside the `samples/` folder:
 
-```powershell
-cd samples
-.\build.ps1
+```bash
+riscv-none-elf-gcc -march=rv32i -mabi=ilp32 -nostdlib -static -T link.ld hello.s -o hello.elf
+riscv-none-elf-objcopy -O binary hello.elf hello.bin
 ```
 
-Then run a binary from the project directory:
+Then run it from the project directory:
 
 ```
 dotnet run ..\samples\hello.bin
-dotnet run ..\samples\sum.bin
-dotnet run ..\samples\fibonacci.bin
 ```
 
 ## Testing
