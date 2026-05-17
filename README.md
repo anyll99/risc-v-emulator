@@ -13,6 +13,11 @@ Example:
 dotnet run program.bin
 ```
 
+To run the built-in test suite:
+```
+dotnet run --test
+```
+
 To produce a binary from a RISC-V assembly file, you need the [riscv-none-elf-gcc toolchain](https://github.com/xpack-binutils/riscv-none-elf-gcc/releases). Then run:
 
 ```bash
@@ -32,11 +37,25 @@ riscv-none-elf-objcopy -O binary program.o program.bin
 - J-Type: `JAL`, `JALR`
 - System: `ECALL` (exit, write), `EBREAK`
 
-**Memory:** 64 KB byte-addressable memory with 8, 16, and 32-bit load/store support.
+**Memory:** 64 KB byte-addressable memory with 8, 16, and 32-bit load/store support. Out-of-bounds accesses print a warning instead of crashing.
 
-**Registers:** 32 general-purpose registers with hardware-accurate `x0` zero-register enforcement.
+**Registers:** 32 general-purpose registers with hardware-accurate `x0` zero-register enforcement. After execution, only non-zero registers are printed to keep the output clean:
+
+```
+PC: 0x00000014
+----------------------------------
+x1   20           (0x00000014)
+x2   5            (0x00000005)
+x3   25           (0x00000019)
+x4   15           (0x0000000F)
+----------------------------------
+```
 
 **Debug mode:** Set `cpu.Debug = true` to enable step-by-step instruction logging.
+
+**Silent mode:** Set `cpu.Silent = true` to suppress all CPU output, useful for running tests programmatically.
+
+**Safety:** Execution is capped at 1,000,000 instructions to prevent infinite loops.
 
 ## Architecture
 
@@ -51,6 +70,31 @@ The CPU follows the standard fetch-decode-execute cycle:
 1. **Fetch** — reads a 32-bit instruction from memory at the current PC
 2. **Decode** — extracts the opcode, registers, and immediates using bitwise masking
 3. **Execute** — performs the operation and updates the PC, registers, or memory
+
+## Testing
+
+The emulator includes a built-in test suite covering all major instruction types. Run it with:
+
+```
+dotnet run --test
+```
+
+Expected output:
+```
+PASS: ADDI x1=20
+PASS: ADD x3=25
+PASS: x0 always zero
+PASS: SUB x4=15
+PASS: AND 15&10=10
+PASS: OR 5|10=15
+PASS: XOR 15^10=5
+PASS: LUI x3=0x1000
+PASS: BEQ taken x1 still 5
+PASS: SW/LW x2=39
+PASS: JAL skips x1=2
+
+11 passed, 0 failed.
+```
 
 ## Requirements
 
