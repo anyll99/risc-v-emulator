@@ -1,12 +1,12 @@
 ﻿using System;
 
-/// <summary>Flat byte-addressable memory with bounds-checked reads and writes.</summary>
+/// <summary>Byte-addressable little-endian memory. Out-of-bounds accesses are ignored.</summary>
 class Memory
 {
     private byte[] byte_array_;
     public bool Silent = false;
 
-    /// <summary>Allocates memory of the given size in bytes. Defaults to 64KB.</summary>
+    /// <summary>Allocates memory of the given size in bytes.</summary>
     public Memory(int size = 65536)
     {
         byte_array_ = new byte[size];
@@ -15,7 +15,7 @@ class Memory
     private bool InBounds(int address, int width)
         => address >= 0 && address <= byte_array_.Length - width;
 
-    /// <summary>Reads an unsigned byte from the given address.</summary>
+    /// <summary>Reads a byte from the given address</summary>
     public uint Read8(int address)
     {
         if (!InBounds(address, 1))
@@ -53,7 +53,7 @@ class Memory
         );
     }
 
-    /// <summary>Writes the low byte of <paramref name="value"/> to the given address.</summary>
+    /// <summary>Writes a byte to the given address.</summary>
     public void Write8(int address, uint value)
     {
         if (!InBounds(address, 1))
@@ -64,7 +64,7 @@ class Memory
         byte_array_[address] = (byte)value;
     }
 
-    /// <summary>Writes the low 16 bits of <paramref name="value"/> as a little-endian halfword.</summary>
+    /// <summary>Writes as a little-endian halfword.</summary>
     public void Write16(int address, uint value)
     {
         if (!InBounds(address, 2))
@@ -76,7 +76,7 @@ class Memory
         byte_array_[address + 1] = (byte)(value >> 8);
     }
 
-    /// <summary>Writes <paramref name="value"/> as a little-endian word to the given address.</summary>
+    /// <summary>Writes as a little-endian word to the given address.</summary>
     public void Write32(int address, uint value)
     {
         if (!InBounds(address, 4))
@@ -96,17 +96,17 @@ class Registers
 {
     private uint[] r = new uint[32];
 
-    /// <summary>Returns the value of register <paramref name="i"/>. Always returns 0 for x0.</summary>
+    /// <summary>Returns the value of register.</summary>
     public uint Read(int i) => i == 0 ? 0 : r[i];
 
-    /// <summary>Writes <paramref name="v"/> to register <paramref name="i"/>. Writes to x0 are silently discarded.</summary>
+    /// <summary>Writes to register. Writes to x0 are silently discarded.</summary>
     public void Write(int i, uint v)
     {
         if (i != 0) r[i] = v;
     }
 }
 
-/// <summary>RV32I CPU. Executes one instruction per <see cref="Step"/> call.</summary>
+/// <summary>RV32I CPU. Executes one instruction per call.</summary>
 class CPU
 {
     private Memory mem;
@@ -133,7 +133,7 @@ class CPU
     private const uint OP_JALR = 0x67;
     private const uint OP_SYSTEM = 0x73;
 
-    /// <summary>Creates a CPU with a fresh memory of <paramref name="memorySize"/> bytes.</summary>
+    /// <summary>Creates a CPU with its own memory.</summary>
     public CPU(int memorySize = 65536)
     {
         mem = new Memory(memorySize);
@@ -151,18 +151,29 @@ class CPU
         return ((int)(value << shift)) >> shift;
     }
 
-    /// <summary>Fetches, decodes, and executes one instruction. Does nothing if <see cref="Halted"/> is true.</summary>
+    /// <summary>Fetches, decodes, and executes one instruction. Does nothing if halted.</summary>
     public void Step()
     {
         if (Halted) return;
 
         uint inst = mem.Read32((int)pc);
 
+        // bits 0-6: selects the instruction format (R, I, load, store, branch, etc.)
         uint opcode = inst & 0x7F;
+        
+        // bits 7-11: destination register
         uint rd = (inst >> 7) & 0x1F;
+
+        // bits 12-14: selects the operation within an opcode (ADD vs XOR)
         uint funct3 = (inst >> 12) & 0x7;
+
+        // bits 15-19: first source register
         uint rs1 = (inst >> 15) & 0x1F;
+
+        // bits 20-24: second source register
         uint rs2 = (inst >> 20) & 0x1F;
+        
+        // bits 25-31: further distinguishes operations (ADD vs SUB, SRL vs SRA)
         uint funct7 = (inst >> 25) & 0x7F;
 
         uint oldPc = pc;
@@ -178,26 +189,32 @@ class CPU
 
                     switch (funct3)
                     {
+                        // ADD / SUB (addition or subtraction)
                         case 0x0:
                             regs.Write((int)rd, funct7 == 0x20 ? a - b : a + b);
                             break;
 
+                        // SLL (shift left logical)
                         case 0x1:
                             regs.Write((int)rd, a << (int)(b & 0x1F));
                             break;
 
+                        //SLT (set less than)
                         case 0x2:
                             regs.Write((int)rd, (uint)((int)a < (int)b ? 1 : 0));
                             break;
 
+                        // SLTU (set less than unsigned)
                         case 0x3:
                             regs.Write((int)rd, a < b ? 1u : 0u);
                             break;
 
+                        // XOR
                         case 0x4:
                             regs.Write((int)rd, a ^ b);
                             break;
 
+                        // SRL / SRA (shift right logical, shift right arithmetic)
                         case 0x5:
                             regs.Write((int)rd,
                                 funct7 == 0x20
@@ -205,10 +222,12 @@ class CPU
                                     : a >> (int)(b & 0x1F));
                             break;
 
+                        // OR
                         case 0x6:
                             regs.Write((int)rd, a | b);
                             break;
-
+                        
+                        // AND
                         case 0x7:
                             regs.Write((int)rd, a & b);
                             break;
@@ -225,26 +244,32 @@ class CPU
 
                     switch (funct3)
                     {
+                        // ADDI(add immediate)
                         case 0x0:
                             regs.Write((int)rd, (uint)((int)a + imm));
                             break;
-
+                        
+                        // SLLI (shift left logical immediate)
                         case 0x1:
                             regs.Write((int)rd, a << shamt);
                             break;
 
+                        // SLTI (set less than immediate)
                         case 0x2:
                             regs.Write((int)rd, (uint)((int)a < imm ? 1 : 0));
                             break;
 
+                        // SLTIU (set less than immediate unsigned)
                         case 0x3:
                             regs.Write((int)rd, a < (uint)imm ? 1u : 0u);
                             break;
 
+                        // XORI (xor immediate)
                         case 0x4:
                             regs.Write((int)rd, a ^ (uint)imm);
                             break;
 
+                        // SRLI / SRAI (shift right logical immediate, shift right arithmetic immediate)
                         case 0x5:
                             regs.Write((int)rd,
                                 funct7 == 0x20
@@ -252,10 +277,12 @@ class CPU
                                     : a >> shamt);
                             break;
 
+                        // ORI (or immediate)
                         case 0x6:
                             regs.Write((int)rd, a | (uint)imm);
                             break;
 
+                        // ANDI (and immediate)
                         case 0x7:
                             regs.Write((int)rd, a & (uint)imm);
                             break;
@@ -271,22 +298,27 @@ class CPU
 
                     switch (funct3)
                     {
+                        // LB (load byte)
                         case 0x0:
                             regs.Write((int)rd, (uint)(sbyte)mem.Read8((int)addr));
                             break;
 
+                        // LH (load halfword)
                         case 0x1:
                             regs.Write((int)rd, (uint)(short)mem.Read16((int)addr));
                             break;
 
+                        // LW (load word)
                         case 0x2:
                             regs.Write((int)rd, mem.Read32((int)addr));
                             break;
 
+                        // LBU (load byte unsigned)
                         case 0x4:
                             regs.Write((int)rd, mem.Read8((int)addr));
                             break;
 
+                        // LHU (load halfword unsigned)
                         case 0x5:
                             regs.Write((int)rd, mem.Read16((int)addr));
                             break;
@@ -308,12 +340,17 @@ class CPU
 
                     switch (funct3)
                     {
+                        // SB (store byte)
                         case 0x0:
                             mem.Write8((int)addr, val);
                             break;
+
+                        // SH (store halfword)
                         case 0x1:
                             mem.Write16((int)addr, val);
                             break;
+
+                        // SW (store word)
                         case 0x2:
                             mem.Write32((int)addr, val);
                             break;
@@ -329,11 +366,17 @@ class CPU
 
                     bool take = funct3 switch
                     {
+                        // BEQ (branch if equal)
                         0x0 => a == b,
+                        // BNE (branch if not equal)
                         0x1 => a != b,
+                        // BLT (branch if less than)
                         0x4 => (int)a < (int)b,
+                        // BGE (branch if greater or equal)
                         0x5 => (int)a >= (int)b,
+                        // BLTU (branch if less than unsigned)
                         0x6 => a < b,
+                        // BGEU (branch if greater or equal unsigned)
                         0x7 => a >= b,
                         _ => false
                     };
@@ -355,11 +398,13 @@ class CPU
 
             // ================= LUI =================
             case OP_LUI:
+                // LUI (load upper immediate)
                 regs.Write((int)rd, inst & 0xFFFFF000);
                 break;
 
             // ================= AUIPC =================
             case OP_AUIPC:
+                // AUIPC (add upper immediate to PC)
                 regs.Write((int)rd, oldPc + (inst & 0xFFFFF000));
                 break;
 
@@ -375,6 +420,7 @@ class CPU
                             21
                         );
 
+                    // (jump and link)
                     regs.Write((int)rd, pc);
                     pc = (uint)((int)oldPc + imm);
                     break;
@@ -385,6 +431,7 @@ class CPU
                 {
                     int imm = SignExtend(inst >> 20, 12);
                     uint target = (uint)((int)regs.Read((int)rs1) + imm) & ~1u;
+                    // (jump and link register)
 
                     regs.Write((int)rd, pc);
                     pc = target;
@@ -397,10 +444,12 @@ class CPU
 
                     switch (funct12)
                     {
+                        // ECALL (environment call) asks the environment to do something, chosen by a7
                         case 0x000:
                             HandleEcall();
                             break;
 
+                        // EBREAK (environment break) halts the cpu
                         case 0x001:
                             if (!Silent) Console.WriteLine("EBREAK hit - halting.");
                             Halted = true;
@@ -434,12 +483,14 @@ class CPU
 
         switch (syscall)
         {
+            // exit, halts with exit code a0
             case 93:
                 uint exitCode = regs.Read(10);
                 if (!Silent) Console.WriteLine($"ECALL exit({exitCode})");
                 Halted = true;
                 break;
 
+            // write, prints a2 bytes starting at address a1 to fd a0
             case 64:
                 {
                     uint fd = regs.Read(10);
@@ -482,7 +533,7 @@ class CPU
         Console.WriteLine("----------------------------------");
     }
 
-    /// <summary>Copies <paramref name="program"/> into memory starting at <paramref name="loadAddress"/>.</summary>
+    /// <summary>Copies program into memory starting at load address.</summary>
     public void LoadProgram(byte[] program, uint loadAddress = 0)
     {
         for (int i = 0; i < program.Length; i++)
