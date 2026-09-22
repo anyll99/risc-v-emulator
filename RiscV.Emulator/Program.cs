@@ -584,6 +584,7 @@ class RiscVProgram
         }
 
         CPU cpu = new CPU();
+        cpu.Debug = true;
         cpu.LoadProgram(program);
 
         const int maxSteps = 1_000_000;

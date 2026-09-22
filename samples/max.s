@@ -8,5 +8,5 @@ _start:
   mv a0, a1
 
 done:
-  l9 a7, 93
+  li a7, 93
   ecall

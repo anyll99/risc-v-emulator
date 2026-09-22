@@ -13,7 +13,7 @@ loop:
 mul_loop:
   beq t1, a0, mul_done
   add a1, a1, t0
-  addi t1, t1, i
+  addi t1, t1, 1
   j mul_loop
 mul_done:
   addi a0, a0, -1
