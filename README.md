@@ -21,7 +21,7 @@ dotnet run --test
 To produce a binary from a RISC-V assembly file, you need the [riscv-none-elf-gcc toolchain](https://github.com/xpack-binutils/riscv-none-elf-gcc/releases). Then run:
 
 ```bash
-riscv-none-elf-gcc -march=rv32i -mabi=ilp32 -nostdlib -static -T link.ld program.s -o program.elf
+riscv-none-elf-gcc -march=rv32i -mabi=ilp32 -nostdlib -static -Wl,-Ttext=0,--no-relax program.s -o program.elf
 riscv-none-elf-objcopy -O binary program.elf program.bin
 ```
 
@@ -84,7 +84,7 @@ The `samples/` folder contains example RISC-V assembly programs you can build an
 To build a sample, compile it with the toolchain from inside the `samples/` folder:
 
 ```bash
-riscv-none-elf-gcc -march=rv32i -mabi=ilp32 -nostdlib -static -T link.ld hello.s -o hello.elf
+riscv-none-elf-gcc -march=rv32i -mabi=ilp32 -nostdlib -static -Wl,-Ttext=0,--no-relax hello.s -o hello.elf
 riscv-none-elf-objcopy -O binary hello.elf hello.bin
 ```
 
@@ -136,5 +136,5 @@ PASS: JALR x3 skipped=0
 
 ## Requirements
 
-- [.NET SDK](https://dotnet.microsoft.com/download) (6.0 or later)
+- [.NET SDK](https://dotnet.microsoft.com/download) (10.0 or later)
 - [xpack-riscv-none-elf-gcc](https://github.com/xpack-binutils/riscv-none-elf-gcc/releases) to assemble `.s` files into binaries
