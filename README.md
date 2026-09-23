@@ -84,8 +84,8 @@ The `samples/` folder contains example RISC-V assembly programs you can build an
 To build a sample, compile it with the toolchain from inside the `samples/` folder:
 
 ```bash
-riscv-none-elf-gcc -march=rv32i -mabi=ilp32 -nostdlib -static -Wl,-Ttext=0,--no-relax hello.s -o hello.elf
-riscv-none-elf-objcopy -O binary hello.elf hello.bin
+riscv64-elf-gcc -march=rv32i -mabi=ilp32 -nostdlib -static -Wl,-Ttext=0,--no-relax program.s -o program.elf
+riscv64-elf-objcopy -O binary program.elf program.bin
 ```
 
 Then run it from the project directory:
